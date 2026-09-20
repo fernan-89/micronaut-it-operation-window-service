@@ -35,11 +35,11 @@ import java.util.UUID;
  *
  * <p><b>BIAN-Aligned Resource Model:</b> {@link com.thinklab.domain.model.MaintenanceTicket} is
  * the Control Record. Every route follows
- * {@code /it-operation-window/v1/{control-record-id}/{behavior-qualifier}}. There is no
+ * {@code /it-operation-window/v1/maintenance-ticket/{control-record-id}/{behavior-qualifier}} (a subordinate resource of the Operation Window Service Domain). There is no
  * {@code DELETE}: {@code control/{status}} and {@code comment/initiate} are the only mutation
  * paths, and {@code COMPLETED} is a terminal, non-exitable state.
  */
-@Controller("/it-operation-window/v1")
+@Controller("/it-operation-window/v1/maintenance-ticket")
 public class MaintenanceTicketController {
 
     private static final Logger log = LoggerFactory.getLogger(MaintenanceTicketController.class);

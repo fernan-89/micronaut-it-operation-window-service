@@ -1,6 +1,7 @@
 package com.thinklab.infrastructure.adapter.in.web.handler;
 
 import com.thinklab.domain.exception.BusinessException;
+import com.thinklab.domain.exception.WindowCollisionException;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -67,7 +68,13 @@ public class GlobalExceptionHandler implements ExceptionHandler<Throwable, HttpR
             if (exception instanceof ConstraintViolationException constraintEx) {
                 log.warn("[ACTION: GLOBAL_EXCEPTION_HANDLER] [PATH: {}] - JSR-380 input validation failure intercepted: {}",
                         path, constraintEx.getMessage());
-                return handleValidationException(constraintEx, path);
+                return handleValidationMessage(constraintEx.getMessage(), path);
+            }
+
+            if (exception instanceof IllegalArgumentException illegalArgumentEx) {
+                log.warn("[ACTION: GLOBAL_EXCEPTION_HANDLER] [PATH: {}] - Malformed input intercepted: {}",
+                        path, illegalArgumentEx.getMessage());
+                return handleValidationMessage(illegalArgumentEx.getMessage(), path);
             }
 
             log.error("[ACTION: GLOBAL_EXCEPTION_HANDLER] [PATH: {}] - CRITICAL: Unhandled technical failure encountered in pipeline: {}",
@@ -78,8 +85,8 @@ public class GlobalExceptionHandler implements ExceptionHandler<Throwable, HttpR
 
     private HttpResponse<Map<String, Object>> handleBusinessException(BusinessException ex, String path) {
         HttpStatus status = switch (ex.getErrorCode()) {
-            case "ERR-OPS-00404" -> HttpStatus.NOT_FOUND;
-            case "ERR-OPS-00409" -> HttpStatus.CONFLICT;
+            case "ERR-OPS-00404", "ERR-WIN-00404" -> HttpStatus.NOT_FOUND;
+            case "ERR-OPS-00409", "ERR-WIN-00409", "ERR-COL-00409" -> HttpStatus.CONFLICT;
             default -> HttpStatus.UNPROCESSABLE_ENTITY;
         };
 
@@ -92,16 +99,28 @@ public class GlobalExceptionHandler implements ExceptionHandler<Throwable, HttpR
                 path
         );
 
+        if (ex instanceof WindowCollisionException collision) {
+            problem.put("conflicts", collision.getConflicts().stream().map(conflict -> {
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("windowId", conflict.windowId().toString());
+                entry.put("title", conflict.title());
+                entry.put("startAt", conflict.startAt().toString());
+                entry.put("endAt", conflict.endAt().toString());
+                entry.put("overlappingAssetIds", conflict.overlappingAssetIds().stream().map(UUID::toString).toList());
+                return entry;
+            }).toList());
+        }
+
         return HttpResponse.status(status).body(problem);
     }
 
-    private HttpResponse<Map<String, Object>> handleValidationException(ConstraintViolationException ex, String path) {
+    private HttpResponse<Map<String, Object>> handleValidationMessage(String message, String path) {
         Map<String, Object> problem = createProblemDetails(
                 URI.create(PROBLEM_TYPE_BASE_URI + "err-validation-00400"),
                 "ERR-VALIDATION-00400",
                 HttpStatus.BAD_REQUEST.getCode(),
                 HttpStatus.BAD_REQUEST.getReason(),
-                "The request payload failed structural validation constraints: " + ex.getMessage(),
+                "The request failed structural validation constraints: " + message,
                 path
         );
 

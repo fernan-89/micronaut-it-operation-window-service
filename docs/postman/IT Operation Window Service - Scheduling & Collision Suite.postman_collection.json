@@ -1,0 +1,2098 @@
+{
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          "// Automatically generate standard W3C traceparent (ADR-010) and X-Trace-Id",
+          "function generateHex(len) {",
+          "    let result = '';",
+          "    const chars = '0123456789abcdef';",
+          "    for (let i = 0; i < len; i++) {",
+          "        result += chars.charAt(Math.floor(Math.random() * chars.length));",
+          "    }",
+          "    return result;",
+          "}",
+          "const traceId = generateHex(32);",
+          "const spanId = generateHex(16);",
+          "const traceparent = `00-${traceId}-${spanId}-01`;",
+          "pm.request.headers.upsert({ key: 'traceparent', value: traceparent });",
+          "pm.request.headers.upsert({ key: 'X-Trace-Id', value: traceId });",
+          "pm.environment.set('currentTraceId', traceId);"
+        ],
+        "type": "text/javascript"
+      }
+    }
+  ],
+  "info": {
+    "_exporter_id": "39879181",
+    "_postman_id": "d5e7f9a1-4b6c-4d8e-9f0a-5b7c9d1e3f4a",
+    "description": "Enterprise-grade E2E Postman Suite for the IT Operation Window Service Domain (BIAN-aligned, ADR-001/005/013/018). Covers the Operation Window lifecycle under /it-operation-window/v1 (initiate, retrieve, reschedule, control/start|complete|cancel), the collision dry-run (collision-check/evaluate) with its impact report, the half-open interval semantics, the subordinate maintenance-ticket resource under /it-operation-window/v1/maintenance-ticket, mandatory X-Tenant-Id/X-Executor auditing, and RFC 7807 error_code assertions (400/404/409, including the ERR-COL-00409 problem carrying the `conflicts` extension). Requires an organisationId environment variable populated from the Party Reference Data Directory Service Domain; every scheduling variable is computed by pre-request scripts relative to now + 60 days.",
+    "name": "IT Operation Window Service - Scheduling & Collision Suite",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "item": [
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Health status is UP', () => pm.expect(pm.response.json().status).to.eql('UP'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "Health Check (Aggregated)",
+          "request": {
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ],
+              "raw": "{{base_url}}/health"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Liveness status is UP', () => pm.expect(pm.response.json().status).to.eql('UP'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "Liveness Probe",
+          "request": {
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health",
+                "liveness"
+              ],
+              "raw": "{{base_url}}/health/liveness"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Readiness status is UP', () => pm.expect(pm.response.json().status).to.eql('UP'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "Readiness Probe",
+          "request": {
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health",
+                "readiness"
+              ],
+              "raw": "{{base_url}}/health/readiness"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Contains JVM metrics', () => pm.expect(pm.response.text()).to.include('jvm_memory'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "Prometheus Metrics",
+          "request": {
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "prometheus"
+              ],
+              "raw": "{{base_url}}/prometheus"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns Swagger UI HTML', () => pm.expect(pm.response.text()).to.include('swagger-ui'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "Swagger UI",
+          "request": {
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "swagger-ui"
+              ],
+              "raw": "{{base_url}}/swagger-ui"
+            }
+          }
+        }
+      ],
+      "name": "00. Infrastructure & Telemetry"
+    },
+    {
+      "item": [
+        {
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const base = Date.now() + 60 * 24 * 3600 * 1000;",
+                  "const h = 3600 * 1000;",
+                  "const iso = (offsetHours) => new Date(base + offsetHours * h).toISOString();",
+                  "pm.environment.set('assetId', pm.variables.replaceIn('{{$guid}}'));",
+                  "pm.environment.set('otherAssetId', pm.variables.replaceIn('{{$guid}}'));",
+                  "pm.environment.set('windowStart', iso(0));",
+                  "pm.environment.set('windowEnd', iso(2));",
+                  "pm.environment.set('overlapStart', iso(1));",
+                  "pm.environment.set('overlapEnd', iso(3));",
+                  "pm.environment.set('laterStart', iso(48));",
+                  "pm.environment.set('laterEnd', iso(50));",
+                  "pm.environment.set('tooLongEnd', iso(80));",
+                  "pm.environment.set('pastStart', new Date(Date.now() - 48 * h).toISOString());",
+                  "pm.environment.set('pastEnd', new Date(Date.now() - 46 * h).toISOString());"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201 Created', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.test('UUID present, SCHEDULED, asset and requester recorded', () => {",
+                  "    pm.expect(json.id).to.not.be.undefined;",
+                  "    pm.expect(json.status).to.eql('SCHEDULED');",
+                  "    pm.expect(json.windowType).to.eql('PATCHING');",
+                  "    pm.expect(json.targetAssetIds).to.include(pm.environment.get('assetId'));",
+                  "    pm.expect(json.requestedBy).to.eql(pm.environment.get('executor'));",
+                  "});",
+                  "pm.environment.set('windowId', json.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "01. Initiate Operation Window (Control Record)",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Core switch firmware upgrade\",\n  \"description\": \"Scheduled by the Postman suite\",\n  \"windowType\": \"PATCHING\",\n  \"targetAssetIds\": [\"{{assetId}}\"],\n  \"startAt\": \"{{windowStart}}\",\n  \"endAt\": \"{{windowEnd}}\"\n}"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "initiate"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/initiate"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Status is SCHEDULED', () => pm.expect(json.status).to.eql('SCHEDULED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "02. Retrieve Window By ID (SCHEDULED)",
+          "request": {
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "{{windowId}}",
+                "retrieve"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/{{windowId}}/retrieve"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Reports the collision and its impact', () => {",
+                  "    pm.expect(json.collides).to.be.true;",
+                  "    pm.expect(json.conflicts).to.have.lengthOf(1);",
+                  "    pm.expect(json.conflicts[0].windowId).to.eql(pm.environment.get('windowId'));",
+                  "    pm.expect(json.conflicts[0].overlappingAssetIds).to.include(pm.environment.get('assetId'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "03. Collision Check - Overlapping Slot Collides (dry-run)",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetAssetIds\": [\"{{assetId}}\"],\n  \"startAt\": \"{{overlapStart}}\",\n  \"endAt\": \"{{overlapEnd}}\"\n}"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "collision-check",
+                "evaluate"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/collision-check/evaluate"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('No collision when the slots only touch', () => pm.expect(pm.response.json().collides).to.be.false);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "04. Collision Check - Back-to-Back Slot Is Free (half-open interval)",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetAssetIds\": [\"{{assetId}}\"],\n  \"startAt\": \"{{windowEnd}}\",\n  \"endAt\": \"{{laterStart}}\"\n}"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "collision-check",
+                "evaluate"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/collision-check/evaluate"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 204 No Content', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "05. Reschedule Window (SCHEDULED only)",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"startAt\": \"{{laterStart}}\",\n  \"endAt\": \"{{laterEnd}}\"\n}"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "{{windowId}}",
+                "reschedule"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/{{windowId}}/reschedule"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Interval moved', () => {",
+                  "    pm.expect(new Date(json.startAt).toISOString()).to.eql(pm.environment.get('laterStart'));",
+                  "    pm.expect(new Date(json.endAt).toISOString()).to.eql(pm.environment.get('laterEnd'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "06. Retrieve Window By ID (Confirm New Interval)",
+          "request": {
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "{{windowId}}",
+                "retrieve"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/{{windowId}}/retrieve"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('No collision after the window moved', () => pm.expect(pm.response.json().collides).to.be.false);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "07. Collision Check - Original Slot Is Free Again",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetAssetIds\": [\"{{assetId}}\"],\n  \"startAt\": \"{{windowStart}}\",\n  \"endAt\": \"{{windowEnd}}\"\n}"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "collision-check",
+                "evaluate"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/collision-check/evaluate"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Only windows on the asset and ours is included', () => {",
+                  "    pm.expect(json).to.be.an('array').that.is.not.empty;",
+                  "    json.forEach(w => pm.expect(w.targetAssetIds).to.include(pm.environment.get('assetId')));",
+                  "    pm.expect(json.some(w => w.id === pm.environment.get('windowId'))).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "08. Retrieve All Windows (status=SCHEDULED, assetId filter)",
+          "request": {
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "retrieve"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "SCHEDULED"
+                },
+                {
+                  "key": "assetId",
+                  "value": "{{assetId}}"
+                }
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/retrieve?status=SCHEDULED&assetId={{assetId}}"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 204 No Content', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "09. Control: Start Window (SCHEDULED -> IN_PROGRESS)",
+          "request": {
+            "header": [
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "{{windowId}}",
+                "control",
+                "start"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/{{windowId}}/control/start"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Status is IN_PROGRESS', () => pm.expect(json.status).to.eql('IN_PROGRESS'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "10. Retrieve Window By ID (Confirm IN_PROGRESS)",
+          "request": {
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "{{windowId}}",
+                "retrieve"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/{{windowId}}/retrieve"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 204 No Content', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "11. Control: Complete Window (IN_PROGRESS -> COMPLETED)",
+          "request": {
+            "header": [
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "{{windowId}}",
+                "control",
+                "complete"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/{{windowId}}/control/complete"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Status is COMPLETED', () => pm.expect(json.status).to.eql('COMPLETED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "12. Retrieve Window By ID (Confirm COMPLETED)",
+          "request": {
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "{{windowId}}",
+                "retrieve"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/{{windowId}}/retrieve"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201 Created', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.environment.set('secondWindowId', json.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "13. Initiate Window On The Same Slot After Completion (completed windows do not block)",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Follow-up patch\",\n  \"description\": \"Scheduled by the Postman suite\",\n  \"windowType\": \"PATCHING\",\n  \"targetAssetIds\": [\"{{assetId}}\"],\n  \"startAt\": \"{{laterStart}}\",\n  \"endAt\": \"{{laterEnd}}\"\n}"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "initiate"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/initiate"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 204 No Content', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "14. Control: Cancel Second Window (Terminal, replaces DELETE)",
+          "request": {
+            "header": [
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "{{secondWindowId}}",
+                "control",
+                "cancel"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/{{secondWindowId}}/control/cancel"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Status is CANCELLED', () => pm.expect(json.status).to.eql('CANCELLED'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "15. Retrieve Window By ID (Confirm CANCELLED)",
+          "request": {
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "{{secondWindowId}}",
+                "retrieve"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/{{secondWindowId}}/retrieve"
+            }
+          }
+        }
+      ],
+      "name": "01. Window Lifecycle & Collision Scenarios"
+    },
+    {
+      "item": [
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201 Created', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.test('OPEN ticket linked to the asset', () => {",
+                  "    pm.expect(json.status).to.eql('OPEN');",
+                  "    pm.expect(json.assetId).to.eql(pm.environment.get('assetId'));",
+                  "});",
+                  "pm.environment.set('ticketId', json.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "01. Initiate Maintenance Ticket",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assetId\": \"{{assetId}}\",\n  \"title\": \"Fan noise on core switch\",\n  \"description\": \"Loud rattling reported by the NOC\"\n}"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "maintenance-ticket",
+                "initiate"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/maintenance-ticket/initiate"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Ticket matches', () => pm.expect(pm.response.json().id).to.eql(pm.environment.get('ticketId')));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "02. Retrieve Ticket By ID",
+          "request": {
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "maintenance-ticket",
+                "{{ticketId}}",
+                "retrieve"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/maintenance-ticket/{{ticketId}}/retrieve"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201 Created', () => pm.response.to.have.status(201));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "03. Capture Comment Advancing the FSM (OPEN -> IN_ANALYSIS)",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Technician on site, inspecting the fan tray.\",\n  \"targetStatus\": \"IN_ANALYSIS\"\n}"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "maintenance-ticket",
+                "{{ticketId}}",
+                "comment",
+                "initiate"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/maintenance-ticket/{{ticketId}}/comment/initiate"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Comment recorded and status advanced', () => {",
+                  "    pm.expect(json.status).to.eql('IN_ANALYSIS');",
+                  "    pm.expect(json.comments).to.have.lengthOf(1);",
+                  "    pm.expect(json.comments[0].author).to.eql(pm.environment.get('executor'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "04. Retrieve Ticket (Confirm IN_ANALYSIS and the comment)",
+          "request": {
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "maintenance-ticket",
+                "{{ticketId}}",
+                "retrieve"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/maintenance-ticket/{{ticketId}}/retrieve"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 204 No Content', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "05. Control: Ticket to AWAITING_PARTS",
+          "request": {
+            "header": [
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "maintenance-ticket",
+                "{{ticketId}}",
+                "control",
+                "AWAITING_PARTS"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/maintenance-ticket/{{ticketId}}/control/AWAITING_PARTS"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 204 No Content', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "06. Control: Ticket back to IN_ANALYSIS",
+          "request": {
+            "header": [
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "maintenance-ticket",
+                "{{ticketId}}",
+                "control",
+                "IN_ANALYSIS"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/maintenance-ticket/{{ticketId}}/control/IN_ANALYSIS"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 204 No Content', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "07. Control: Ticket to COMPLETED (Terminal)",
+          "request": {
+            "header": [
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "maintenance-ticket",
+                "{{ticketId}}",
+                "control",
+                "COMPLETED"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/maintenance-ticket/{{ticketId}}/control/COMPLETED"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Ours is included', () => pm.expect(json.some(t => t.id === pm.environment.get('ticketId'))).to.be.true);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "08. Retrieve All Tickets (status=COMPLETED)",
+          "request": {
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "maintenance-ticket",
+                "retrieve"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "COMPLETED"
+                }
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/maintenance-ticket/retrieve?status=COMPLETED"
+            }
+          }
+        }
+      ],
+      "name": "02. Maintenance Tickets (Subordinate Resource)"
+    },
+    {
+      "item": [
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-VALIDATION-00400', () => {",
+                  "    pm.expect(json.status).to.eql(400);",
+                  "    pm.expect(json.error_code).to.eql('ERR-VALIDATION-00400');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "01. Initiate Window - Blank Title (400)",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"\",\n  \"description\": \"Scheduled by the Postman suite\",\n  \"windowType\": \"PATCHING\",\n  \"targetAssetIds\": [\"{{otherAssetId}}\"],\n  \"startAt\": \"{{windowStart}}\",\n  \"endAt\": \"{{windowEnd}}\"\n}"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "initiate"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/initiate"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-VALIDATION-00400', () => {",
+                  "    pm.expect(json.status).to.eql(400);",
+                  "    pm.expect(json.error_code).to.eql('ERR-VALIDATION-00400');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "02. Initiate Window - End Before Start (400)",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Backwards\",\n  \"description\": \"Scheduled by the Postman suite\",\n  \"windowType\": \"PATCHING\",\n  \"targetAssetIds\": [\"{{otherAssetId}}\"],\n  \"startAt\": \"{{windowEnd}}\",\n  \"endAt\": \"{{windowStart}}\"\n}"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "initiate"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/initiate"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-VALIDATION-00400', () => {",
+                  "    pm.expect(json.status).to.eql(400);",
+                  "    pm.expect(json.error_code).to.eql('ERR-VALIDATION-00400');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "03. Initiate Window - Longer Than 72 Hours (400)",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Way too long\",\n  \"description\": \"Scheduled by the Postman suite\",\n  \"windowType\": \"PATCHING\",\n  \"targetAssetIds\": [\"{{otherAssetId}}\"],\n  \"startAt\": \"{{windowStart}}\",\n  \"endAt\": \"{{tooLongEnd}}\"\n}"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "initiate"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/initiate"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-VALIDATION-00400', () => {",
+                  "    pm.expect(json.status).to.eql(400);",
+                  "    pm.expect(json.error_code).to.eql('ERR-VALIDATION-00400');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "04. Initiate Window - Starts In The Past (400)",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Yesterday\",\n  \"description\": \"Scheduled by the Postman suite\",\n  \"windowType\": \"PATCHING\",\n  \"targetAssetIds\": [\"{{otherAssetId}}\"],\n  \"startAt\": \"{{pastStart}}\",\n  \"endAt\": \"{{pastEnd}}\"\n}"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "initiate"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/initiate"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-VALIDATION-00400', () => {",
+                  "    pm.expect(json.status).to.eql(400);",
+                  "    pm.expect(json.error_code).to.eql('ERR-VALIDATION-00400');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "05. Initiate Window - No Target Assets (400)",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"No assets\",\n  \"windowType\": \"PATCHING\",\n  \"targetAssetIds\": [],\n  \"startAt\": \"{{windowStart}}\",\n  \"endAt\": \"{{windowEnd}}\"\n}"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "initiate"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/initiate"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400 Bad Request', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "06. Initiate Window - Missing X-Tenant-Id Header (400)",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"No tenant\",\n  \"description\": \"Scheduled by the Postman suite\",\n  \"windowType\": \"PATCHING\",\n  \"targetAssetIds\": [\"{{otherAssetId}}\"],\n  \"startAt\": \"{{windowStart}}\",\n  \"endAt\": \"{{windowEnd}}\"\n}"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "initiate"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/initiate"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-VALIDATION-00400', () => {",
+                  "    pm.expect(json.status).to.eql(400);",
+                  "    pm.expect(json.error_code).to.eql('ERR-VALIDATION-00400');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "07. Initiate Window - Malformed X-Tenant-Id (400)",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Bad tenant\",\n  \"description\": \"Scheduled by the Postman suite\",\n  \"windowType\": \"PATCHING\",\n  \"targetAssetIds\": [\"{{otherAssetId}}\"],\n  \"startAt\": \"{{windowStart}}\",\n  \"endAt\": \"{{windowEnd}}\"\n}"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "not-a-uuid"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "initiate"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/initiate"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.environment.set('blockingWindowId', pm.response.json().id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "08. Setup: Schedule a Window That Will Block Its Asset",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Blocking window\",\n  \"description\": \"Scheduled by the Postman suite\",\n  \"windowType\": \"MIGRATION\",\n  \"targetAssetIds\": [\"{{otherAssetId}}\"],\n  \"startAt\": \"{{windowStart}}\",\n  \"endAt\": \"{{windowEnd}}\"\n}"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "initiate"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/initiate"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-COL-00409', () => {",
+                  "    pm.expect(json.status).to.eql(409);",
+                  "    pm.expect(json.error_code).to.eql('ERR-COL-00409');",
+                  "});",
+                  "pm.test('The problem document exposes the impact', () => {",
+                  "    pm.expect(json.conflicts).to.have.lengthOf(1);",
+                  "    pm.expect(json.conflicts[0].windowId).to.eql(pm.environment.get('blockingWindowId'));",
+                  "    pm.expect(json.conflicts[0].overlappingAssetIds).to.include(pm.environment.get('otherAssetId'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "09. Initiate Window - Collides On The Same Asset (409 with impact)",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Collider\",\n  \"description\": \"Scheduled by the Postman suite\",\n  \"windowType\": \"PATCHING\",\n  \"targetAssetIds\": [\"{{otherAssetId}}\"],\n  \"startAt\": \"{{overlapStart}}\",\n  \"endAt\": \"{{overlapEnd}}\"\n}"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "initiate"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/initiate"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.environment.set('freeAssetId', pm.variables.replaceIn('{{$guid}}'));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201 Created', () => pm.response.to.have.status(201));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "10. Initiate Window - Same Slot On A Different Asset Is Accepted (201)",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Different asset\",\n  \"description\": \"Scheduled by the Postman suite\",\n  \"windowType\": \"PATCHING\",\n  \"targetAssetIds\": [\"{{freeAssetId}}\"],\n  \"startAt\": \"{{windowStart}}\",\n  \"endAt\": \"{{windowEnd}}\"\n}"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "initiate"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/initiate"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201 Created', () => pm.response.to.have.status(201));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "11. Initiate Window - Back-to-Back On The Same Asset Is Accepted (201)",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Right after\",\n  \"description\": \"Scheduled by the Postman suite\",\n  \"windowType\": \"PATCHING\",\n  \"targetAssetIds\": [\"{{otherAssetId}}\"],\n  \"startAt\": \"{{windowEnd}}\",\n  \"endAt\": \"{{laterStart}}\"\n}"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "initiate"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/initiate"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-WIN-00404', () => {",
+                  "    pm.expect(json.status).to.eql(404);",
+                  "    pm.expect(json.error_code).to.eql('ERR-WIN-00404');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "12. Retrieve Window - Non-existent UUID (404)",
+          "request": {
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "00000000-0000-0000-0000-000000000000",
+                "retrieve"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/00000000-0000-0000-0000-000000000000/retrieve"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400 Bad Request', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "13. Retrieve Window - Malformed UUID Path (400)",
+          "request": {
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "not-a-uuid",
+                "retrieve"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/not-a-uuid/retrieve"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 204 No Content', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "14. Control: Start The Blocking Window (Setup)",
+          "request": {
+            "header": [
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "{{blockingWindowId}}",
+                "control",
+                "start"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/{{blockingWindowId}}/control/start"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-WIN-00409', () => {",
+                  "    pm.expect(json.status).to.eql(409);",
+                  "    pm.expect(json.error_code).to.eql('ERR-WIN-00409');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "15. Reschedule Window - Already IN_PROGRESS (409)",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"startAt\": \"{{laterStart}}\",\n  \"endAt\": \"{{laterEnd}}\"\n}"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "{{blockingWindowId}}",
+                "reschedule"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/{{blockingWindowId}}/reschedule"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-WIN-00409', () => {",
+                  "    pm.expect(json.status).to.eql(409);",
+                  "    pm.expect(json.error_code).to.eql('ERR-WIN-00409');",
+                  "});",
+                  "pm.test('Detail explains the idempotency violation', () => pm.expect(json.detail).to.include('Idempotency Violation'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "16. Control: Start Twice - Idempotency Violation (409)",
+          "request": {
+            "header": [
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "{{blockingWindowId}}",
+                "control",
+                "start"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/{{blockingWindowId}}/control/start"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 204 No Content', () => pm.response.to.have.status(204));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "17. Control: Complete The Blocking Window (Setup)",
+          "request": {
+            "header": [
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "{{blockingWindowId}}",
+                "control",
+                "complete"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/{{blockingWindowId}}/control/complete"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-WIN-00409', () => {",
+                  "    pm.expect(json.status).to.eql(409);",
+                  "    pm.expect(json.error_code).to.eql('ERR-WIN-00409');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "18. Control: Cancel A COMPLETED Window - Terminal Violation (409)",
+          "request": {
+            "header": [
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "{{blockingWindowId}}",
+                "control",
+                "cancel"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/{{blockingWindowId}}/control/cancel"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-OPS-00404', () => {",
+                  "    pm.expect(json.status).to.eql(404);",
+                  "    pm.expect(json.error_code).to.eql('ERR-OPS-00404');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "19. Ticket: Retrieve Non-existent UUID (404)",
+          "request": {
+            "header": [],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "maintenance-ticket",
+                "00000000-0000-0000-0000-000000000000",
+                "retrieve"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/maintenance-ticket/00000000-0000-0000-0000-000000000000/retrieve"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.environment.set('probeTicketId', pm.response.json().id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "20. Setup: Initiate Ticket For The Illegal-Transition Test",
+          "request": {
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assetId\": \"{{otherAssetId}}\",\n  \"title\": \"Illegal transition probe\"\n}"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "POST",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "maintenance-ticket",
+                "initiate"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/maintenance-ticket/initiate"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "const json = pm.response.json();",
+                  "pm.test('RFC 7807 error_code is ERR-OPS-00409', () => {",
+                  "    pm.expect(json.status).to.eql(409);",
+                  "    pm.expect(json.error_code).to.eql('ERR-OPS-00409');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "21. Ticket: OPEN -> COMPLETED Is An Illegal Jump (409)",
+          "request": {
+            "header": [
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "maintenance-ticket",
+                "{{probeTicketId}}",
+                "control",
+                "COMPLETED"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/maintenance-ticket/{{probeTicketId}}/control/COMPLETED"
+            }
+          }
+        }
+      ],
+      "name": "03. Negative Tests & Boundary Validation"
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8084"
+    }
+  ]
+}
