@@ -157,4 +157,14 @@ class GlobalExceptionHandlerTest {
         Mockito.when(request.getAttribute(Mockito.eq("traceId"), Mockito.eq(String.class))).thenReturn(Optional.of("attr-trace"));
         assertProblem(exceptionHandler.handle(request, new WindowNotFoundException("x")), HttpStatus.NOT_FOUND, "ERR-WIN-00404");
     }
+
+    @Test
+    @DisplayName("a trace id from the X-Trace-Id header is honoured and a blank one replaced")
+    void traceIdFromHeader() {
+        Mockito.when(headers.get("X-Trace-Id")).thenReturn("header-trace");
+        org.junit.jupiter.api.Assertions.assertEquals(404, exceptionHandler.handle(request, new MaintenanceTicketNotFoundException("x")).getStatus().getCode());
+
+        Mockito.when(headers.get("X-Trace-Id")).thenReturn(" ");
+        org.junit.jupiter.api.Assertions.assertEquals(404, exceptionHandler.handle(request, new MaintenanceTicketNotFoundException("x")).getStatus().getCode());
+    }
 }

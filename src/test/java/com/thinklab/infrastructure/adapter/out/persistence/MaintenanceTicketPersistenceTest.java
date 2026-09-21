@@ -193,4 +193,20 @@ class MaintenanceTicketPersistenceTest {
 
         verify(repository, never()).update(any(MaintenanceTicketEntity.class));
     }
+
+    @Test
+    @DisplayName("adapter: appendComment tolerates a stored ticket whose comment list is null")
+    void appendCommentToNullList() {
+        MaintenanceTicketEntity noComments = new MaintenanceTicketEntity(entity.id(), entity.organisationId(), entity.assetId(),
+                entity.title(), entity.description(), TicketStatus.OPEN, null, entity.createdAt(), entity.updatedAt(), entity.version());
+        when(repository.findById(ticket.getId())).thenReturn(Mono.just(noComments));
+        when(repository.update(any(MaintenanceTicketEntity.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+
+        StepVerifier.create(adapter.appendComment(ticket.getId(), new Comment(UUID.randomUUID(), "tech", "note", NOW), TicketStatus.OPEN))
+                .verifyComplete();
+
+        ArgumentCaptor<MaintenanceTicketEntity> captor = ArgumentCaptor.forClass(MaintenanceTicketEntity.class);
+        verify(repository).update(captor.capture());
+        assertEquals(1, captor.getValue().comments().size());
+    }
 }
