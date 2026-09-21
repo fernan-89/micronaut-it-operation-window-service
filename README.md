@@ -124,3 +124,7 @@ docker build -t thinklab-operation-window-service:latest .
 
 `docs/adr/`: 001 hexagonal reactive stack · 005 UUID identity sovereignty · 013 BIAN service domain
 conventions · 018 operation window scheduler, collision detection and scope.
+
+## License
+
+Proprietary - all rights reserved. See [LICENSE](LICENSE). This software is not open source.
