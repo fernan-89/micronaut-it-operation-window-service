@@ -113,9 +113,9 @@ class OperationWindowControllerTest {
         when(retrieveAllUseCase.execute(organisationId, WindowStatus.SCHEDULED, assetId)).thenReturn(Flux.just(sample));
         when(retrieveAllUseCase.execute(organisationId, null, null)).thenReturn(Flux.just(sample, sample));
 
-        StepVerifier.create(controller.retrieveAll(organisationId.toString(), WindowStatus.SCHEDULED, assetId)).expectNext(sample).verifyComplete();
-        StepVerifier.create(controller.retrieveAll(organisationId.toString(), null, null)).expectNextCount(2).verifyComplete();
-        assertThrows(IllegalArgumentException.class, () -> controller.retrieveAll("bad", null, null));
+        StepVerifier.create(controller.retrieveAll(organisationId.toString(), WindowStatus.SCHEDULED, assetId)).expectNext(List.of(sample)).verifyComplete();
+        StepVerifier.create(controller.retrieveAll(organisationId.toString(), null, null)).assertNext(list -> assertEquals(2, list.size())).verifyComplete();
+        StepVerifier.create(controller.retrieveAll("bad", null, null)).expectError(IllegalArgumentException.class).verify();
     }
 
     @Test

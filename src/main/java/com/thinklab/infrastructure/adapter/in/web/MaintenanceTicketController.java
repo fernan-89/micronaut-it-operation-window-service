@@ -25,9 +25,9 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -90,13 +90,13 @@ public class MaintenanceTicketController {
 
     /** Behavior Qualifier: {@code retrieve} (collection). Lists tenant-scoped MaintenanceTickets. */
     @Get("/retrieve")
-    public Flux<MaintenanceTicketResponse> retrieveAll(
+    public Mono<List<MaintenanceTicketResponse>> retrieveAll(
             @Header(TENANT_HEADER) @NotBlank String tenantId,
             @QueryValue @Nullable TicketStatus status
     ) {
         log.info("[ACTION: RETRIEVE_MAINTENANCE_TICKETS] Received request to list tickets for organisation: {} [status={}]", tenantId, status);
 
-        return retrieveMaintenanceTicketsUseCase.execute(UUID.fromString(tenantId), status);
+        return Mono.defer(() -> retrieveMaintenanceTicketsUseCase.execute(UUID.fromString(tenantId), status).collectList());
     }
 
     /** Behavior Qualifier: {@code comment/initiate}. Captures a comment, optionally advancing the FSM. */

@@ -94,9 +94,9 @@ class MaintenanceTicketControllerTest {
         when(retrieveAllUseCase.execute(organisationId, TicketStatus.OPEN)).thenReturn(Flux.just(sample));
         when(retrieveAllUseCase.execute(organisationId, null)).thenReturn(Flux.just(sample, sample));
 
-        StepVerifier.create(controller.retrieveAll(organisationId.toString(), TicketStatus.OPEN)).expectNext(sample).verifyComplete();
-        StepVerifier.create(controller.retrieveAll(organisationId.toString(), null)).expectNextCount(2).verifyComplete();
-        assertThrows(IllegalArgumentException.class, () -> controller.retrieveAll("bad", null));
+        StepVerifier.create(controller.retrieveAll(organisationId.toString(), TicketStatus.OPEN)).expectNext(List.of(sample)).verifyComplete();
+        StepVerifier.create(controller.retrieveAll(organisationId.toString(), null)).assertNext(list -> assertEquals(2, list.size())).verifyComplete();
+        StepVerifier.create(controller.retrieveAll("bad", null)).expectError(IllegalArgumentException.class).verify();
     }
 
     @Test

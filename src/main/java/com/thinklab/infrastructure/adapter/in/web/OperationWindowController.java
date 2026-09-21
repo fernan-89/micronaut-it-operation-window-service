@@ -26,9 +26,9 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -99,7 +99,7 @@ public class OperationWindowController {
 
     /** Behavior Qualifier: {@code retrieve} (collection). Lists tenant-scoped windows, filterable by status / asset. */
     @Get("/retrieve")
-    public Flux<OperationWindowResponse> retrieveAll(
+    public Mono<List<OperationWindowResponse>> retrieveAll(
             @Header(TENANT_HEADER) @NotBlank String tenantId,
             @QueryValue @Nullable WindowStatus status,
             @QueryValue @Nullable UUID assetId
@@ -107,7 +107,7 @@ public class OperationWindowController {
         log.info("[ACTION: RETRIEVE_OPERATION_WINDOWS] Received request to list windows for organisation: {} status: {} asset: {}",
                 tenantId, status, assetId);
 
-        return retrieveOperationWindowsUseCase.execute(UUID.fromString(tenantId), status, assetId);
+        return Mono.defer(() -> retrieveOperationWindowsUseCase.execute(UUID.fromString(tenantId), status, assetId).collectList());
     }
 
     /** Behavior Qualifier: {@code reschedule}. Moves a SCHEDULED window (409 on collision or wrong status). */
