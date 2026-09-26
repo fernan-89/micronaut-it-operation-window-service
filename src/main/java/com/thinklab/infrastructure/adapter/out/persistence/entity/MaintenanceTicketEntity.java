@@ -5,6 +5,8 @@ import com.thinklab.domain.model.MaintenanceTicket.Comment;
 import com.thinklab.domain.model.MaintenanceTicket.TicketStatus;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.data.annotation.Id;
+import io.micronaut.data.annotation.Index;
+import io.micronaut.data.annotation.Indexes;
 import io.micronaut.data.annotation.MappedEntity;
 import io.micronaut.data.annotation.Version;
 import io.micronaut.serde.annotation.Serdeable;
@@ -26,6 +28,7 @@ import java.util.stream.Collectors;
 @Serdeable
 @Introspected
 @MappedEntity("maintenance_tickets")
+@Indexes(@Index(columns = {"organisationId", "status"}))
 public record MaintenanceTicketEntity(
 
         @Id

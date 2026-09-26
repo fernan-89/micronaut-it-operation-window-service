@@ -5,6 +5,8 @@ import com.thinklab.domain.model.OperationWindow.WindowStatus;
 import com.thinklab.domain.model.OperationWindow.WindowType;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.data.annotation.Id;
+import io.micronaut.data.annotation.Index;
+import io.micronaut.data.annotation.Indexes;
 import io.micronaut.data.annotation.MappedEntity;
 import io.micronaut.data.annotation.Version;
 import io.micronaut.serde.annotation.Serdeable;
@@ -20,12 +22,17 @@ import java.util.UUID;
  * Infrastructure Entity: Persistence model for the OperationWindow aggregate mapped to MongoDB via
  * Micronaut Data (same strategy as {@link MaintenanceTicketEntity}, see ADR-016).
  *
+ * <p>The index serves the collision query (ADR-018): equality on {@code organisationId}, {@code $in} on
+ * {@code status}, then the {@code startAt} range, so it is scanned for exactly the tenant's active windows
+ * that start before the requested end. The tenant listings use its prefix. The kit creates it at startup.
+ *
  * @author ThinkLab
  * @since 1.0
  */
 @Serdeable
 @Introspected
 @MappedEntity("operation_windows")
+@Indexes(@Index(columns = {"organisationId", "status", "startAt"}))
 public record OperationWindowEntity(
 
         @Id
