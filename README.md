@@ -1,8 +1,8 @@
 # Thinklab IT Operation Window Service
 
-**Version:** v1.0.0-BIAN
+**Version:** 1.0.0
 
-**Status:** Production-Ready (Mission-Critical)
+**Status:** Reference implementation — portfolio project
 
 ## Overview
 
