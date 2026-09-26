@@ -125,6 +125,18 @@ docker build -t thinklab-operation-window-service:latest .
 `docs/adr/`: 001 hexagonal reactive stack · 005 UUID identity sovereignty · 013 BIAN service domain
 conventions · 018 operation window scheduler, collision detection and scope.
 
+### Automated Tests
+
+```bash
+./gradlew test               # unit suite + 100% line/branch coverage gate (no Docker needed)
+./gradlew integrationTest    # Testcontainers suite against a real MongoDB replica set (needs Docker)
+./gradlew check              # both, as CI runs it
+```
+
+The integration suite (`src/integrationTest`, platform
+[ADR-025](https://github.com/fernan-89/micronaut-hash-token-registry-service/blob/master/docs/adr/025-integration-tests-with-testcontainers.md))
+runs operation windows and maintenance tickets through the Micronaut Data queries against a real MongoDB: above all the collision query behind ADR-018 (half-open intervals, so touching windows do not collide; only `SCHEDULED`/`IN_PROGRESS` windows of the same tenant), rescheduling, tenant listing with status and asset filters, ticket comments appended in order, and not-found handling.
+
 ## License
 
 Licensed under the [PolyForm Strict License 1.0.0](LICENSE): you may read and use this software for noncommercial purposes only. Modifying it, creating derivative works, redistributing it and any commercial use are not permitted without a separate written license. This software is not open source.
