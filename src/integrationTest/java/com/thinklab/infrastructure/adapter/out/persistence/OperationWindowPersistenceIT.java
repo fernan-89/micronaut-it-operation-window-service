@@ -10,12 +10,17 @@ import com.thinklab.domain.model.OperationWindow.WindowStatus;
 import com.thinklab.domain.model.OperationWindow.WindowType;
 import com.thinklab.domain.repository.MaintenanceTicketRepository;
 import com.thinklab.domain.repository.OperationWindowRepository;
+import com.mongodb.client.model.Filters;
+import com.mongodb.reactivestreams.client.MongoClient;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import io.micronaut.test.support.TestPropertyProvider;
 import jakarta.inject.Inject;
+import org.bson.Document;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -28,6 +33,7 @@ import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Operation windows and maintenance tickets against a real MongoDB, through the Micronaut Data queries the
@@ -41,11 +47,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class OperationWindowPersistenceIT implements TestPropertyProvider {
 
+    private static final String DATABASE = "it_operation_window_it";
     private static final Instant T10 = Instant.parse("2026-10-01T10:00:00Z");
 
     @Override
     public Map<String, String> getProperties() {
-        return Map.of("mongodb.uri", MongoContainer.uri("it_operation_window_it"));
+        return Map.of("mongodb.uri", MongoContainer.uri(DATABASE));
     }
 
     @Inject
@@ -53,6 +60,14 @@ class OperationWindowPersistenceIT implements TestPropertyProvider {
 
     @Inject
     MaintenanceTicketRepository tickets;
+
+    @Inject
+    MongoClient mongoClient;
+
+    private Set<Document> indexKeys(String collection) {
+        return Flux.from(mongoClient.getDatabase(DATABASE).getCollection(collection).listIndexes())
+                .map(index -> index.get("key", Document.class)).collect(Collectors.toSet()).block();
+    }
 
     private static Instant at(int hour) {
         return T10.plus(hour - 10L, ChronoUnit.HOURS);
@@ -166,5 +181,26 @@ class OperationWindowPersistenceIT implements TestPropertyProvider {
 
     private static Set<UUID> ids(List<OperationWindow> list) {
         return list.stream().map(OperationWindow::getId).collect(Collectors.toSet());
+    }
+
+    @Test
+    @DisplayName("the declared indexes exist, and the collision query is served by an index scan, not a collection scan")
+    void collisionQueryUsesTheIndex() {
+        window(UUID.randomUUID(), 10, 12);
+        Document windowsIndex = new Document("organisationId", 1).append("status", 1).append("startAt", 1);
+
+        assertTrue(indexKeys("operation_windows").contains(windowsIndex), () -> "operation_windows: " + indexKeys("operation_windows"));
+        assertTrue(indexKeys("maintenance_tickets").contains(new Document("organisationId", 1).append("status", 1)),
+                () -> "maintenance_tickets: " + indexKeys("maintenance_tickets"));
+
+        Document plan = Mono.from(mongoClient.getDatabase(DATABASE).getCollection("operation_windows")
+                .find(Filters.and(
+                        Filters.eq("organisationId", UUID.randomUUID()),
+                        Filters.in("status", List.of(WindowStatus.SCHEDULED.name(), WindowStatus.IN_PROGRESS.name())),
+                        Filters.lt("startAt", at(13)),
+                        Filters.gt("endAt", at(11))))
+                .explain(Document.class)).block();
+        String winningPlan = plan.get("queryPlanner", Document.class).get("winningPlan", Document.class).toJson();
+        assertTrue(winningPlan.contains("IXSCAN") && winningPlan.contains("organisationId_1_status_1_startAt_1"), winningPlan);
     }
 }

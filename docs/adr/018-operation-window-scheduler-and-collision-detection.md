@@ -76,3 +76,13 @@ few); an indexed array query can replace it behind the same port if that ever ch
   get actionable impact instead of a bare refusal.
 - Negative: two aggregates live in one service, and the ticket routes changed. Splitting the
   maintenance ticket into its own service later is possible without touching the window model.
+
+## Addendum: indexes
+The collision query (`organisationId` equality, `status` `$in` the active statuses, `startAt < end`,
+`endAt > start`) is served by the compound index `{organisationId: 1, status: 1, startAt: 1}` on
+`operation_windows`, declared with `@Indexes` on the entity and created at startup by
+thinklab-service-kit's `MongoIndexInitializer` (kit ADR-005). Field order follows equality, then `$in`,
+then range; `endAt` is filtered from the scanned entries. The tenant listings use the same index by
+prefix, and `maintenance_tickets` gets `{organisationId: 1, status: 1}` for its own. The integration
+suite asserts that both indexes exist and that the collision query's winning plan is an `IXSCAN` on the
+compound index.
