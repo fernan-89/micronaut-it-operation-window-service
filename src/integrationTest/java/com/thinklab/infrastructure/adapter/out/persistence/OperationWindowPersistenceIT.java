@@ -48,7 +48,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class OperationWindowPersistenceIT implements TestPropertyProvider {
 
     private static final String DATABASE = "it_operation_window_it";
-    private static final Instant T10 = Instant.parse("2026-10-01T10:00:00Z");
+    // Always in the future: a fixed date here turns into "cannot start in the past" the day it passes.
+    private static final Instant T10 = Instant.now().plus(365, ChronoUnit.DAYS).truncatedTo(ChronoUnit.DAYS).plus(10, ChronoUnit.HOURS);
 
     @Override
     public Map<String, String> getProperties() {
