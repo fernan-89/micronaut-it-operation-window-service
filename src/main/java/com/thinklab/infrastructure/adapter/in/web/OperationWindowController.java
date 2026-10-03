@@ -51,6 +51,7 @@ public class OperationWindowController {
     private static final Logger log = LoggerFactory.getLogger(OperationWindowController.class);
     static final String TENANT_HEADER = "X-Tenant-Id";
     static final String EXECUTOR_HEADER = "X-Executor";
+    static final String ROLE_HEADER = "X-Role";
 
     private final InitiateOperationWindowUseCase initiateOperationWindowUseCase;
     private final RetrieveOperationWindowUseCase retrieveOperationWindowUseCase;
@@ -80,12 +81,13 @@ public class OperationWindowController {
     public Mono<HttpResponse<OperationWindowResponse>> initiate(
             @Header(TENANT_HEADER) @NotBlank String tenantId,
             @Header(EXECUTOR_HEADER) @NotBlank String executor,
+            @Header(ROLE_HEADER) @Nullable String role,
             @Body @Valid InitiateOperationWindowRequest request
     ) {
         log.info("[ACTION: INITIATE_OPERATION_WINDOW] [EXECUTOR: {}] Received request to schedule window '{}' for organisation: {}",
                 executor, request.title(), tenantId);
 
-        return initiateOperationWindowUseCase.execute(UUID.fromString(tenantId), request, executor)
+        return initiateOperationWindowUseCase.execute(UUID.fromString(tenantId), request, executor, role)
                 .map(HttpResponse::created);
     }
 

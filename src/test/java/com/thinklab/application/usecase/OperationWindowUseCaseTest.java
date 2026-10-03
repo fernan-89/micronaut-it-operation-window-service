@@ -206,6 +206,37 @@ class OperationWindowUseCaseTest {
     }
 
     @Test
+    @DisplayName("Initiate: a freeze override from a role below ADMIN/SERVICE is refused (403) before any I/O; ADMIN, SERVICE and no role (security off) are allowed")
+    void initiateOverrideNeedsAnElevatedRole() {
+        InitiateOperationWindowUseCase useCase = new InitiateOperationWindowUseCase(hashServicePort, repository, guard);
+
+        for (String role : new String[]{"OPERATOR", "REQUESTER", "VIEWER"}) {
+            StepVerifier.create(useCase.execute(organisationId, overrideRequest(WindowType.DEPLOYMENT, "P1 outage"), EXECUTOR, role))
+                    .expectErrorSatisfies(error -> assertEquals("ERR-WIN-00403", ((com.thinklab.domain.exception.FreezeOverrideNotPermittedException) error).getErrorCode()))
+                    .verify();
+        }
+        verifyNoInteractions(repository, hashServicePort);
+
+        when(repository.findActiveOverlapping(eq(organisationId), any(), any())).thenReturn(Flux.empty());
+        when(hashServicePort.generateSovereignId("operation-window-creation")).thenReturn(Mono.just(UUID.randomUUID()));
+        when(repository.create(any(OperationWindow.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        for (String role : new String[]{"ADMIN", "SERVICE", null}) {
+            StepVerifier.create(useCase.execute(organisationId, overrideRequest(WindowType.DEPLOYMENT, "P1 outage"), EXECUTOR, role)).expectNextCount(1).verifyComplete();
+        }
+    }
+
+    @Test
+    @DisplayName("Initiate: a window with no override needs no elevated role")
+    void initiateWithoutOverrideNeedsNoRole() {
+        when(repository.findActiveOverlapping(eq(organisationId), any(), any())).thenReturn(Flux.empty());
+        when(hashServicePort.generateSovereignId("operation-window-creation")).thenReturn(Mono.just(UUID.randomUUID()));
+        when(repository.create(any(OperationWindow.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+
+        StepVerifier.create(new InitiateOperationWindowUseCase(hashServicePort, repository, guard).execute(organisationId, request(), EXECUTOR, "VIEWER"))
+                .expectNextCount(1).verifyComplete();
+    }
+
+    @Test
     @DisplayName("Initiate: an invalid interval fails fast (400) before any I/O")
     void initiateInvalidIntervalFailsFast() {
         InitiateOperationWindowRequest bad = new InitiateOperationWindowRequest("t", null, WindowType.PATCHING, Set.of(assetA), end, start, null);

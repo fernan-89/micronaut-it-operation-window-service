@@ -89,6 +89,7 @@ public class GlobalExceptionHandler implements ExceptionHandler<Throwable, HttpR
     private HttpResponse<Map<String, Object>> handleBusinessException(BusinessException ex, String path) {
         HttpStatus status = switch (ex.getErrorCode()) {
             case "ERR-OPS-00404", "ERR-WIN-00404" -> HttpStatus.NOT_FOUND;
+            case "ERR-WIN-00403" -> HttpStatus.FORBIDDEN;
             default -> HttpStatus.CONFLICT;
         };
 

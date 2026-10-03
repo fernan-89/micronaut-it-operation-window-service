@@ -76,9 +76,9 @@ class OperationWindowControllerTest {
     @DisplayName("initiate returns 201 Created")
     void initiate() {
         InitiateOperationWindowRequest request = new InitiateOperationWindowRequest("Firmware", "d", WindowType.PATCHING, Set.of(assetId), start, end, null);
-        when(initiateUseCase.execute(organisationId, request, EXECUTOR)).thenReturn(Mono.just(sample));
+        when(initiateUseCase.execute(organisationId, request, EXECUTOR, null)).thenReturn(Mono.just(sample));
 
-        StepVerifier.create(controller.initiate(organisationId.toString(), EXECUTOR, request))
+        StepVerifier.create(controller.initiate(organisationId.toString(), EXECUTOR, null, request))
                 .assertNext(response -> {
                     assertEquals(HttpStatus.CREATED, response.getStatus());
                     assertEquals(windowId, response.body().id());
@@ -91,7 +91,7 @@ class OperationWindowControllerTest {
     void initiateMalformedTenant() {
         InitiateOperationWindowRequest request = new InitiateOperationWindowRequest("t", null, WindowType.PATCHING, Set.of(assetId), start, end, null);
 
-        assertThrows(IllegalArgumentException.class, () -> controller.initiate("nope", EXECUTOR, request));
+        assertThrows(IllegalArgumentException.class, () -> controller.initiate("nope", EXECUTOR, null, request));
     }
 
     @Test

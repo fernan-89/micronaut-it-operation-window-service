@@ -27,8 +27,7 @@ the change that needed it.
 ## Consequences
 - Positive: an approved emergency change can be scheduled during a freeze without touching the freeze.
 - Positive: the exception is greppable (`CHANGE_FREEZE OVERRIDE`) on both the window and the change.
-- Negative: any caller allowed to `initiate` can claim an override; with security enabled this is only as
-  strict as the role check on that endpoint. A dedicated role for the override is the next step if that
-  proves too loose.
+- Negative (tightened by ADR-021): any caller allowed to `initiate` could claim an override; with security on it now needs the
+  verified role ADMIN or SERVICE.
 - Negative: the justification is free text stored in `description`, not a structured field; fine for
   audit reading, not for reporting.

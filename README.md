@@ -56,7 +56,7 @@ SCHEDULED | IN_PROGRESS -> CANCELLED (terminal, soft — no DELETE)
 
 `initiate` takes an optional `changeFreezeOverrideJustification` (ADR-020): a `DEPLOYMENT` window carrying it is reserved over an
 active `CHANGE_FREEZE` window (all other collisions still apply); the justification is recorded in the window's description
-and logged at WARN.
+and logged at WARN. With security on it also needs the verified role ADMIN or SERVICE (ADR-021, `403 ERR-WIN-00403` otherwise).
 
 ### Operation Window — `/it-operation-window/v1`
 
@@ -83,6 +83,7 @@ and logged at WARN.
 | error_code | HTTP | Meaning |
 |---|---|---|
 | `ERR-WIN-00404` | 404 | Window not found |
+| `ERR-WIN-00403` | 403 | A freeze override was requested by a role below ADMIN/SERVICE (ADR-021) |
 | `ERR-WIN-00409` | 409 | Illegal/idempotent transition, or reschedule of a non-SCHEDULED window |
 | `ERR-COL-00409` | 409 | Collision — the problem document carries a `conflicts` array (the impact) |
 | `ERR-OPS-00404` / `ERR-OPS-00409` | 404 / 409 | Maintenance ticket not found / illegal transition |

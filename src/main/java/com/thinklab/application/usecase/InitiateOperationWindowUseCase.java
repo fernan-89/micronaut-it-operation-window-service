@@ -3,7 +3,9 @@ package com.thinklab.application.usecase;
 import com.thinklab.application.dto.request.InitiateOperationWindowRequest;
 import com.thinklab.application.dto.response.OperationWindowResponse;
 import com.thinklab.application.mapper.OperationWindowMapper;
+import com.thinklab.domain.exception.FreezeOverrideNotPermittedException;
 import com.thinklab.domain.model.OperationWindow;
+import com.thinklab.domain.model.FreezeOverridePolicy;
 import com.thinklab.domain.port.HashServicePort;
 import com.thinklab.domain.repository.OperationWindowRepository;
 import jakarta.inject.Singleton;
@@ -36,9 +38,21 @@ public class InitiateOperationWindowUseCase {
         this.collisionGuard = collisionGuard;
     }
 
+    /** Without a verified role (security off, or a caller that does not ask for an override). */
     public Mono<OperationWindowResponse> execute(UUID organisationId, InitiateOperationWindowRequest request, String executor) {
+        return execute(organisationId, request, executor, null);
+    }
+
+    /**
+     * @param role the verified role (X-Role) of the caller, {@code null} when security is off; decides whether a freeze override
+     *             may be granted (ADR-021)
+     */
+    public Mono<OperationWindowResponse> execute(UUID organisationId, InitiateOperationWindowRequest request, String executor, String role) {
         String justification = request.changeFreezeOverrideJustification();
         boolean overrideFreeze = justification != null;
+        if (overrideFreeze && !FreezeOverridePolicy.permits(role)) {
+            return Mono.error(new FreezeOverrideNotPermittedException(role));
+        }
         if (overrideFreeze && (justification.isBlank() || request.windowType() != OperationWindow.WindowType.DEPLOYMENT)) {
             throw new IllegalArgumentException("A change-freeze override needs a non-blank justification and is only allowed for a DEPLOYMENT window.");
         }
