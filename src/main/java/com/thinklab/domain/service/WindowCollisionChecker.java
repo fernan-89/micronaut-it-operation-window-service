@@ -39,12 +39,23 @@ public final class WindowCollisionChecker {
      */
     public static List<WindowConflict> detect(UUID candidateWindowId, Set<UUID> assetIds, Instant startAt,
                                               Instant endAt, Collection<OperationWindow> existing) {
+        return detect(candidateWindowId, assetIds, startAt, endAt, existing, false);
+    }
+
+    /**
+     * Same as above; with {@code ignoreChangeFreeze} the {@code CHANGE_FREEZE} windows are not compared (a deliberate,
+     * audited override requested by the caller) - every other active window still collides.
+     */
+    public static List<WindowConflict> detect(UUID candidateWindowId, Set<UUID> assetIds, Instant startAt,
+                                              Instant endAt, Collection<OperationWindow> existing,
+                                              boolean ignoreChangeFreeze) {
         OperationWindow.validateTargets(assetIds);
         OperationWindow.validateInterval(startAt, endAt);
 
         return existing.stream()
                 .filter(window -> candidateWindowId == null || !window.getId().equals(candidateWindowId))
                 .filter(OperationWindow::isActive)
+                .filter(window -> !(ignoreChangeFreeze && window.getWindowType() == OperationWindow.WindowType.CHANGE_FREEZE))
                 .filter(window -> window.overlapsInTime(startAt, endAt))
                 .map(window -> new WindowConflict(window.getId(), window.getTitle(), window.getStartAt(),
                         window.getEndAt(), window.sharedAssetsWith(assetIds)))

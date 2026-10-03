@@ -14,6 +14,10 @@ import java.util.UUID;
 /**
  * DTO for scheduling a new Operation Window (BIAN Behavior Qualifier: {@code initiate}).
  * organisationId travels via the {@code X-Tenant-Id} header, not the body.
+ *
+ * <p>{@code changeFreezeOverrideJustification} (ADR-020 of this service): when present, a {@code DEPLOYMENT} window
+ * may be reserved over an active {@code CHANGE_FREEZE} window (collisions with every other window still apply).
+ * The caller - change-management-service, for an ECAB-approved EMERGENCY change - owns the authorization.
  */
 @Serdeable
 public record InitiateOperationWindowRequest(
@@ -37,5 +41,15 @@ public record InitiateOperationWindowRequest(
         @NotNull(message = "End instant is required")
         Instant endAt,
 
-        UUID maintenanceTicketId
-) {}
+        UUID maintenanceTicketId,
+
+        @Size(max = 500, message = "Change-freeze override justification must not exceed 500 characters")
+        String changeFreezeOverrideJustification
+) {
+
+    /** The pre-override shape: a window that does not ask to override a change freeze. */
+    public InitiateOperationWindowRequest(String title, String description, WindowType windowType, Set<UUID> targetAssetIds,
+                                          Instant startAt, Instant endAt, UUID maintenanceTicketId) {
+        this(title, description, windowType, targetAssetIds, startAt, endAt, maintenanceTicketId, null);
+    }
+}

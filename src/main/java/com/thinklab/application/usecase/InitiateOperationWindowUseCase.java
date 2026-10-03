@@ -37,15 +37,34 @@ public class InitiateOperationWindowUseCase {
     }
 
     public Mono<OperationWindowResponse> execute(UUID organisationId, InitiateOperationWindowRequest request, String executor) {
+        String justification = request.changeFreezeOverrideJustification();
+        boolean overrideFreeze = justification != null;
+        if (overrideFreeze && (justification.isBlank() || request.windowType() != OperationWindow.WindowType.DEPLOYMENT)) {
+            throw new IllegalArgumentException("A change-freeze override needs a non-blank justification and is only allowed for a DEPLOYMENT window.");
+        }
         log.info("[USE CASE] Scheduling operation window for organisation: {} assets: {}", organisationId, request.targetAssetIds());
 
         // Validates every invariant up-front (throws IllegalArgumentException -> 400) without any I/O.
         OperationWindowMapper.toDomain(request, UUID.randomUUID(), organisationId, executor);
 
-        return collisionGuard.assertFree(organisationId, null, request.targetAssetIds(), request.startAt(), request.endAt())
+        // The override leaves a trace on the window record itself (its description) as well as in the log.
+        InitiateOperationWindowRequest effective = overrideFreeze ? withOverrideNote(request, justification) : request;
+        if (overrideFreeze) {
+            log.warn("[CHANGE_FREEZE OVERRIDE] organisation: {} executor: {} assets: {} justification: {}",
+                    organisationId, executor, request.targetAssetIds(), justification);
+        }
+
+        return collisionGuard.assertFree(organisationId, null, request.targetAssetIds(), request.startAt(), request.endAt(), overrideFreeze)
                 .then(Mono.defer(() -> hashServicePort.generateSovereignId("operation-window-creation")))
-                .map(sovereignId -> OperationWindowMapper.toDomain(request, sovereignId, organisationId, executor))
+                .map(sovereignId -> OperationWindowMapper.toDomain(effective, sovereignId, organisationId, executor))
                 .flatMap(repository::create)
                 .map(OperationWindowMapper::toResponse);
+    }
+
+    private static InitiateOperationWindowRequest withOverrideNote(InitiateOperationWindowRequest request, String justification) {
+        String note = "[CHANGE_FREEZE OVERRIDE] " + justification;
+        String description = request.description() == null || request.description().isBlank() ? note : request.description() + '\n' + note;
+        return new InitiateOperationWindowRequest(request.title(), description, request.windowType(), request.targetAssetIds(),
+                request.startAt(), request.endAt(), request.maintenanceTicketId(), justification);
     }
 }

@@ -34,18 +34,30 @@ public class WindowCollisionGuard {
     /** Emits the conflicts (possibly empty) the given interval would create. */
     public Mono<List<WindowConflict>> detect(UUID organisationId, UUID excludeWindowId, Set<UUID> assetIds,
                                              Instant startAt, Instant endAt) {
+        return detect(organisationId, excludeWindowId, assetIds, startAt, endAt, false);
+    }
+
+    /** As above; {@code ignoreChangeFreeze} skips the CHANGE_FREEZE windows (audited override). */
+    public Mono<List<WindowConflict>> detect(UUID organisationId, UUID excludeWindowId, Set<UUID> assetIds,
+                                             Instant startAt, Instant endAt, boolean ignoreChangeFreeze) {
         OperationWindow.validateTargets(assetIds);
         OperationWindow.validateInterval(startAt, endAt);
 
         return repository.findActiveOverlapping(organisationId, startAt, endAt)
                 .collectList()
-                .map(candidates -> WindowCollisionChecker.detect(excludeWindowId, assetIds, startAt, endAt, candidates));
+                .map(candidates -> WindowCollisionChecker.detect(excludeWindowId, assetIds, startAt, endAt, candidates, ignoreChangeFreeze));
     }
 
     /** Completes when the interval is free, or errors with a {@link WindowCollisionException}. */
     public Mono<Void> assertFree(UUID organisationId, UUID excludeWindowId, Set<UUID> assetIds,
                                  Instant startAt, Instant endAt) {
-        return detect(organisationId, excludeWindowId, assetIds, startAt, endAt)
+        return assertFree(organisationId, excludeWindowId, assetIds, startAt, endAt, false);
+    }
+
+    /** As above; {@code ignoreChangeFreeze} skips the CHANGE_FREEZE windows (audited override). */
+    public Mono<Void> assertFree(UUID organisationId, UUID excludeWindowId, Set<UUID> assetIds,
+                                 Instant startAt, Instant endAt, boolean ignoreChangeFreeze) {
+        return detect(organisationId, excludeWindowId, assetIds, startAt, endAt, ignoreChangeFreeze)
                 .flatMap(conflicts -> conflicts.isEmpty()
                         ? Mono.<Void>empty()
                         : Mono.error(new WindowCollisionException(conflicts)));

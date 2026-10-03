@@ -54,6 +54,10 @@ SCHEDULED | IN_PROGRESS -> CANCELLED (terminal, soft — no DELETE)
 `X-Tenant-Id` is mandatory on `initiate`, the collection `retrieve` and `collision-check/evaluate`;
 `X-Executor` on every mutation.
 
+`initiate` takes an optional `changeFreezeOverrideJustification` (ADR-020): a `DEPLOYMENT` window carrying it is reserved over an
+active `CHANGE_FREEZE` window (all other collisions still apply); the justification is recorded in the window's description
+and logged at WARN.
+
 ### Operation Window — `/it-operation-window/v1`
 
 | Behavior Qualifier | Method & Path |

@@ -111,6 +111,100 @@ class OperationWindowUseCaseTest {
         verify(repository, never()).create(any());
     }
 
+    private OperationWindow freeze() {
+        return OperationWindow.createNew(UUID.randomUUID(), organisationId, "Year-end freeze", null, WindowType.CHANGE_FREEZE,
+                Set.of(assetA), start.minus(Duration.ofHours(1)), end.plus(Duration.ofHours(1)), null, EXECUTOR);
+    }
+
+    private InitiateOperationWindowRequest overrideRequest(WindowType type, String justification) {
+        return new InitiateOperationWindowRequest("Emergency fix", "desc", type, Set.of(assetA), start, end, null, justification);
+    }
+
+    @Test
+    @DisplayName("Initiate: a DEPLOYMENT window with a justification is reserved over a CHANGE_FREEZE and records the override in its description")
+    void initiateOverridesChangeFreeze() {
+        UUID sovereign = UUID.randomUUID();
+        when(repository.findActiveOverlapping(eq(organisationId), any(), any())).thenReturn(Flux.just(freeze()));
+        when(hashServicePort.generateSovereignId("operation-window-creation")).thenReturn(Mono.just(sovereign));
+        when(repository.create(any(OperationWindow.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+
+        StepVerifier.create(new InitiateOperationWindowUseCase(hashServicePort, repository, guard)
+                        .execute(organisationId, overrideRequest(WindowType.DEPLOYMENT, "P1 outage, ECAB approved"), EXECUTOR))
+                .assertNext(response -> {
+                    assertEquals(sovereign, response.id());
+                    assertTrue(response.description().contains("[CHANGE_FREEZE OVERRIDE] P1 outage, ECAB approved"));
+                    assertTrue(response.description().startsWith("desc"));
+                })
+                .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("Initiate: the override note stands alone when the window has no description")
+    void initiateOverrideWithoutDescription() {
+        when(repository.findActiveOverlapping(eq(organisationId), any(), any())).thenReturn(Flux.empty());
+        when(hashServicePort.generateSovereignId("operation-window-creation")).thenReturn(Mono.just(UUID.randomUUID()));
+        when(repository.create(any(OperationWindow.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        InitiateOperationWindowRequest noDescription = new InitiateOperationWindowRequest("Emergency fix", null,
+                WindowType.DEPLOYMENT, Set.of(assetA), start, end, null, "P1 outage");
+
+        StepVerifier.create(new InitiateOperationWindowUseCase(hashServicePort, repository, guard)
+                        .execute(organisationId, noDescription, EXECUTOR))
+                .assertNext(response -> assertEquals("[CHANGE_FREEZE OVERRIDE] P1 outage", response.description()))
+                .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("Initiate: a blank description is replaced by the override note")
+    void initiateOverrideWithBlankDescription() {
+        when(repository.findActiveOverlapping(eq(organisationId), any(), any())).thenReturn(Flux.empty());
+        when(hashServicePort.generateSovereignId("operation-window-creation")).thenReturn(Mono.just(UUID.randomUUID()));
+        when(repository.create(any(OperationWindow.class))).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+        InitiateOperationWindowRequest blank = new InitiateOperationWindowRequest("Emergency fix", "  ",
+                WindowType.DEPLOYMENT, Set.of(assetA), start, end, null, "P1 outage");
+
+        StepVerifier.create(new InitiateOperationWindowUseCase(hashServicePort, repository, guard)
+                        .execute(organisationId, blank, EXECUTOR))
+                .assertNext(response -> assertEquals("[CHANGE_FREEZE OVERRIDE] P1 outage", response.description()))
+                .verifyComplete();
+    }
+
+    @Test
+    @DisplayName("Initiate: the override skips only CHANGE_FREEZE windows - a colliding non-freeze window still blocks")
+    void initiateOverrideStillCollidesWithOtherWindows() {
+        when(repository.findActiveOverlapping(eq(organisationId), any(), any())).thenReturn(Flux.just(freeze(), existing));
+
+        StepVerifier.create(new InitiateOperationWindowUseCase(hashServicePort, repository, guard)
+                        .execute(organisationId, overrideRequest(WindowType.DEPLOYMENT, "P1 outage"), EXECUTOR))
+                .expectErrorSatisfies(error -> {
+                    WindowCollisionException collision = (WindowCollisionException) error;
+                    assertEquals(1, collision.getConflicts().size());
+                    assertEquals(existing.getId(), collision.getConflicts().get(0).windowId());
+                })
+                .verify();
+    }
+
+    @Test
+    @DisplayName("Initiate: without a justification a CHANGE_FREEZE still blocks a DEPLOYMENT window")
+    void initiateWithoutOverrideIsBlockedByFreeze() {
+        when(repository.findActiveOverlapping(eq(organisationId), any(), any())).thenReturn(Flux.just(freeze()));
+
+        StepVerifier.create(new InitiateOperationWindowUseCase(hashServicePort, repository, guard)
+                        .execute(organisationId, overrideRequest(WindowType.DEPLOYMENT, null), EXECUTOR))
+                .expectError(WindowCollisionException.class)
+                .verify();
+    }
+
+    @Test
+    @DisplayName("Initiate: a blank justification, or an override on a non-DEPLOYMENT window, is refused (400) before any I/O")
+    void initiateRefusesInvalidOverride() {
+        InitiateOperationWindowUseCase useCase = new InitiateOperationWindowUseCase(hashServicePort, repository, guard);
+
+        assertThrows(IllegalArgumentException.class, () -> useCase.execute(organisationId, overrideRequest(WindowType.DEPLOYMENT, "  "), EXECUTOR));
+        assertThrows(IllegalArgumentException.class, () -> useCase.execute(organisationId, overrideRequest(WindowType.PATCHING, "P1 outage"), EXECUTOR));
+
+        verifyNoInteractions(repository, hashServicePort);
+    }
+
     @Test
     @DisplayName("Initiate: an invalid interval fails fast (400) before any I/O")
     void initiateInvalidIntervalFailsFast() {

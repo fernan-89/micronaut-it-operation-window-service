@@ -47,6 +47,22 @@ class WindowCollisionCheckerTest {
     }
 
     @Test
+    @DisplayName("ignoreChangeFreeze skips only CHANGE_FREEZE windows; every other active window still collides")
+    void ignoreChangeFreeze() {
+        OperationWindow freeze = OperationWindow.createNew(UUID.randomUUID(), org, "Freeze", null, WindowType.CHANGE_FREEZE,
+                Set.of(assetA), base, base.plus(Duration.ofHours(10)), null, "planner");
+        OperationWindow maintenance = window("Maintenance", Set.of(assetA), 0, 10);
+        Instant from = base.plus(Duration.ofHours(1));
+        Instant to = base.plus(Duration.ofHours(2));
+
+        assertEquals(1, WindowCollisionChecker.detect(null, Set.of(assetA), from, to, List.of(freeze)).size());
+        assertTrue(WindowCollisionChecker.detect(null, Set.of(assetA), from, to, List.of(freeze), true).isEmpty());
+        assertEquals(1, WindowCollisionChecker.detect(null, Set.of(assetA), from, to, List.of(freeze), false).size());
+        assertEquals(List.of(maintenance.getId()), WindowCollisionChecker.detect(null, Set.of(assetA), from, to, List.of(freeze, maintenance), true)
+                .stream().map(WindowConflict::windowId).toList());
+    }
+
+    @Test
     @DisplayName("no existing windows means no conflicts")
     void empty() {
         assertTrue(detect(Set.of(assetA), 0, 2).isEmpty());
