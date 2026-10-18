@@ -16,6 +16,7 @@ import org.slf4j.MDC;
 
 import java.net.URI;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -39,6 +40,7 @@ public class GlobalExceptionHandler implements ExceptionHandler<Throwable, HttpR
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     private static final String UNKNOWN_ENUM_PREFIX = "No enum constant ";
+    private static final String DATE_MESSAGE = "A date must be written as YYYY-MM-DD and a moment as an ISO-8601 instant (2026-10-18T10:00:00Z).";
     private static final String PROBLEM_TYPE_BASE_URI = "https://api.thinklab.com/errors/";
     private static final String MDC_TRACE_KEY = "traceId";
     private static final String TRACE_ID_HEADER = "X-Trace-Id";
@@ -73,6 +75,11 @@ public class GlobalExceptionHandler implements ExceptionHandler<Throwable, HttpR
                 return handleValidationMessage(constraintEx.getMessage(), path);
             }
 
+            if (exception instanceof DateTimeParseException) {
+                // The text that could not be read is never repeated, to the caller or in the log: it was typed by a person or a tool.
+                log.warn("[ACTION: GLOBAL_EXCEPTION_HANDLER] [PATH: {}] - A date or a moment that could not be read was intercepted.", path);
+                return handleValidationMessage(DATE_MESSAGE, path);
+            }
             if (exception instanceof IllegalArgumentException illegalArgumentEx) {
                 String message = describe(illegalArgumentEx);
                 log.warn("[ACTION: GLOBAL_EXCEPTION_HANDLER] [PATH: {}] - Malformed input intercepted: {}", path, message);
