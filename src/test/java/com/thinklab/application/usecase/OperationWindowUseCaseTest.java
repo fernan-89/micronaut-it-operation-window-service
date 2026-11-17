@@ -267,13 +267,13 @@ class OperationWindowUseCaseTest {
     @DisplayName("Retrieve: projects the aggregate, or fails with 404")
     void retrieve() {
         UUID id = existing.getId();
-        when(repository.findById(id)).thenReturn(Mono.just(existing)).thenReturn(Mono.empty());
+        when(repository.findById(id, organisationId)).thenReturn(Mono.just(existing)).thenReturn(Mono.empty());
         RetrieveOperationWindowUseCase useCase = new RetrieveOperationWindowUseCase(repository);
 
-        StepVerifier.create(useCase.execute(id))
+        StepVerifier.create(useCase.execute(id, organisationId))
                 .assertNext(response -> assertEquals("Existing", response.title()))
                 .verifyComplete();
-        StepVerifier.create(useCase.execute(id))
+        StepVerifier.create(useCase.execute(id, organisationId))
                 .expectErrorSatisfies(error -> assertEquals("ERR-WIN-00404", ((WindowNotFoundException) error).getErrorCode()))
                 .verify();
     }
@@ -297,12 +297,12 @@ class OperationWindowUseCaseTest {
         UUID id = existing.getId();
         Instant newStart = start.plus(Duration.ofDays(2));
         Instant newEnd = newStart.plus(Duration.ofHours(1));
-        when(repository.findById(id)).thenReturn(Mono.just(existing));
+        when(repository.findById(id, organisationId)).thenReturn(Mono.just(existing));
         when(repository.findActiveOverlapping(eq(organisationId), eq(newStart), eq(newEnd))).thenReturn(Flux.just(existing));
         when(repository.updateSchedule(id, newStart, newEnd)).thenReturn(Mono.empty());
 
         StepVerifier.create(new RescheduleOperationWindowUseCase(repository, guard)
-                        .execute(id, new RescheduleOperationWindowRequest(newStart, newEnd)))
+                        .execute(id, organisationId, new RescheduleOperationWindowRequest(newStart, newEnd)))
                 .verifyComplete();
 
         verify(repository).updateSchedule(id, newStart, newEnd);
@@ -314,11 +314,11 @@ class OperationWindowUseCaseTest {
         UUID id = existing.getId();
         OperationWindow other = OperationWindow.createNew(UUID.randomUUID(), organisationId, "Other", null, WindowType.MIGRATION,
                 Set.of(assetA), start.plus(Duration.ofDays(2)), start.plus(Duration.ofDays(2)).plus(Duration.ofHours(2)), null, EXECUTOR);
-        when(repository.findById(id)).thenReturn(Mono.just(existing));
+        when(repository.findById(id, organisationId)).thenReturn(Mono.just(existing));
         when(repository.findActiveOverlapping(eq(organisationId), any(), any())).thenReturn(Flux.just(other));
 
         StepVerifier.create(new RescheduleOperationWindowUseCase(repository, guard)
-                        .execute(id, new RescheduleOperationWindowRequest(start.plus(Duration.ofDays(2)), start.plus(Duration.ofDays(2)).plus(Duration.ofHours(1)))))
+                        .execute(id, organisationId, new RescheduleOperationWindowRequest(start.plus(Duration.ofDays(2)), start.plus(Duration.ofDays(2)).plus(Duration.ofHours(1)))))
                 .expectError(WindowCollisionException.class)
                 .verify();
 
@@ -329,10 +329,10 @@ class OperationWindowUseCaseTest {
     @DisplayName("Reschedule: 404 when the window does not exist")
     void rescheduleNotFound() {
         UUID id = UUID.randomUUID();
-        when(repository.findById(id)).thenReturn(Mono.empty());
+        when(repository.findById(id, organisationId)).thenReturn(Mono.empty());
 
         StepVerifier.create(new RescheduleOperationWindowUseCase(repository, guard)
-                        .execute(id, new RescheduleOperationWindowRequest(start, end)))
+                        .execute(id, organisationId, new RescheduleOperationWindowRequest(start, end)))
                 .expectError(WindowNotFoundException.class)
                 .verify();
     }
@@ -341,10 +341,10 @@ class OperationWindowUseCaseTest {
     @DisplayName("Reschedule: a window that already started cannot move (409) and never writes")
     void rescheduleNotScheduled() {
         existing.start();
-        when(repository.findById(existing.getId())).thenReturn(Mono.just(existing));
+        when(repository.findById(existing.getId(), existing.getOrganisationId())).thenReturn(Mono.just(existing));
 
         StepVerifier.create(new RescheduleOperationWindowUseCase(repository, guard)
-                        .execute(existing.getId(), new RescheduleOperationWindowRequest(start, end)))
+                        .execute(existing.getId(), existing.getOrganisationId(), new RescheduleOperationWindowRequest(start, end)))
                 .expectError(InvalidWindowStatusException.class)
                 .verify();
 
@@ -357,13 +357,13 @@ class OperationWindowUseCaseTest {
     @DisplayName("Control: START then COMPLETE persist the matching statuses")
     void controlLifecycle() {
         UUID id = existing.getId();
-        when(repository.findById(id)).thenReturn(Mono.just(existing));
+        when(repository.findById(id, organisationId)).thenReturn(Mono.just(existing));
         when(repository.updateStatus(id, WindowStatus.IN_PROGRESS)).thenReturn(Mono.empty());
         when(repository.updateStatus(id, WindowStatus.COMPLETED)).thenReturn(Mono.empty());
         ControlOperationWindowUseCase useCase = new ControlOperationWindowUseCase(repository);
 
-        StepVerifier.create(useCase.execute(id, ControlOperationWindowUseCase.Action.START)).verifyComplete();
-        StepVerifier.create(useCase.execute(id, ControlOperationWindowUseCase.Action.COMPLETE)).verifyComplete();
+        StepVerifier.create(useCase.execute(id, organisationId, ControlOperationWindowUseCase.Action.START)).verifyComplete();
+        StepVerifier.create(useCase.execute(id, organisationId, ControlOperationWindowUseCase.Action.COMPLETE)).verifyComplete();
 
         verify(repository).updateStatus(id, WindowStatus.IN_PROGRESS);
         verify(repository).updateStatus(id, WindowStatus.COMPLETED);
@@ -373,10 +373,10 @@ class OperationWindowUseCaseTest {
     @DisplayName("Control: CANCEL persists the terminal status")
     void controlCancel() {
         UUID id = existing.getId();
-        when(repository.findById(id)).thenReturn(Mono.just(existing));
+        when(repository.findById(id, organisationId)).thenReturn(Mono.just(existing));
         when(repository.updateStatus(id, WindowStatus.CANCELLED)).thenReturn(Mono.empty());
 
-        StepVerifier.create(new ControlOperationWindowUseCase(repository).execute(id, ControlOperationWindowUseCase.Action.CANCEL))
+        StepVerifier.create(new ControlOperationWindowUseCase(repository).execute(id, organisationId, ControlOperationWindowUseCase.Action.CANCEL))
                 .verifyComplete();
     }
 
@@ -384,14 +384,14 @@ class OperationWindowUseCaseTest {
     @DisplayName("Control: an illegal move never reaches the repository; a missing window is 404")
     void controlFailures() {
         UUID id = existing.getId();
-        when(repository.findById(id)).thenReturn(Mono.just(existing)).thenReturn(Mono.empty());
+        when(repository.findById(id, organisationId)).thenReturn(Mono.just(existing)).thenReturn(Mono.empty());
         ControlOperationWindowUseCase useCase = new ControlOperationWindowUseCase(repository);
 
-        StepVerifier.create(useCase.execute(id, ControlOperationWindowUseCase.Action.COMPLETE))
+        StepVerifier.create(useCase.execute(id, organisationId, ControlOperationWindowUseCase.Action.COMPLETE))
                 .expectError(InvalidWindowStatusException.class).verify();
         verify(repository, never()).updateStatus(any(), any());
 
-        StepVerifier.create(useCase.execute(id, ControlOperationWindowUseCase.Action.START))
+        StepVerifier.create(useCase.execute(id, organisationId, ControlOperationWindowUseCase.Action.START))
                 .expectError(WindowNotFoundException.class).verify();
     }
 
@@ -469,5 +469,18 @@ class OperationWindowUseCaseTest {
 
         assertThrows(UnsupportedOperationException.class, () -> exception.getConflicts().clear());
         assertTrue(exception.getMessage().contains("1 active window"));
+    }
+
+    @Test
+    @DisplayName("every by-id lookup is made in the caller's tenant: another tenant's window is the same as none, and nothing is written")
+    void anotherTenantsWindow() {
+        UUID id = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+        when(repository.findById(id, other)).thenReturn(Mono.empty());
+
+        StepVerifier.create(new RetrieveOperationWindowUseCase(repository).execute(id, other)).expectError(WindowNotFoundException.class).verify();
+
+        org.mockito.Mockito.verify(repository, org.mockito.Mockito.never()).findById(id, organisationId);
+        org.mockito.Mockito.verifyNoMoreInteractions(repository);
     }
 }

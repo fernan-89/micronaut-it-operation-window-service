@@ -134,10 +134,10 @@ class MaintenanceTicketPersistenceTest {
     @Test
     @DisplayName("adapter: findById maps the entity, or completes empty")
     void findById() {
-        when(repository.findById(ticket.getId())).thenReturn(Mono.just(entity)).thenReturn(Mono.empty());
+        when(repository.findByIdAndOrganisationId(ticket.getId(), ticket.getOrganisationId())).thenReturn(Mono.just(entity)).thenReturn(Mono.empty());
 
-        StepVerifier.create(adapter.findById(ticket.getId())).expectNextCount(1).verifyComplete();
-        StepVerifier.create(adapter.findById(ticket.getId())).verifyComplete();
+        StepVerifier.create(adapter.findById(ticket.getId(), ticket.getOrganisationId())).expectNextCount(1).verifyComplete();
+        StepVerifier.create(adapter.findById(ticket.getId(), ticket.getOrganisationId())).verifyComplete();
     }
 
     @Test

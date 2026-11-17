@@ -29,10 +29,10 @@ public class ControlOperationWindowUseCase {
         this.repository = repository;
     }
 
-    public Mono<Void> execute(UUID id, Action action) {
+    public Mono<Void> execute(UUID id, UUID organisationId, Action action) {
         log.info("[USE CASE] Controlling operation window lifecycle: {} for ID: {}", action, id);
 
-        return repository.findById(id)
+        return repository.findById(id, organisationId)
                 .switchIfEmpty(Mono.error(new WindowNotFoundException(id)))
                 .flatMap(window -> {
                     action.apply(window);

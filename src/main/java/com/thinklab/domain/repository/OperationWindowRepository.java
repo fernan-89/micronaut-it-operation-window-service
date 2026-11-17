@@ -19,7 +19,7 @@ public interface OperationWindowRepository {
 
     Mono<OperationWindow> create(OperationWindow window);
 
-    Mono<OperationWindow> findById(UUID id);
+    Mono<OperationWindow> findById(UUID id, UUID organisationId);
 
     /**
      * Tenant-scoped listing.

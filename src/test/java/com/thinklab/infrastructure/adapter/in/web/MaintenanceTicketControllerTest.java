@@ -37,6 +37,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class MaintenanceTicketControllerTest {
 
+    private static final String TENANT = UUID.randomUUID().toString();
+
     private static final String EXECUTOR = "tech-1";
 
     @Mock private InitiateMaintenanceTicketUseCase initiateUseCase;
@@ -81,11 +83,11 @@ class MaintenanceTicketControllerTest {
     @DisplayName("retrieveById returns 200 OK and surfaces 404")
     void retrieveById() {
         UUID missing = UUID.randomUUID();
-        when(retrieveUseCase.execute(ticketId)).thenReturn(Mono.just(sample));
-        when(retrieveUseCase.execute(missing)).thenReturn(Mono.error(new MaintenanceTicketNotFoundException(missing)));
+        when(retrieveUseCase.execute(ticketId, UUID.fromString(TENANT))).thenReturn(Mono.just(sample));
+        when(retrieveUseCase.execute(missing, UUID.fromString(TENANT))).thenReturn(Mono.error(new MaintenanceTicketNotFoundException(missing)));
 
-        StepVerifier.create(controller.retrieveById(ticketId)).assertNext(r -> assertEquals(HttpStatus.OK, r.getStatus())).verifyComplete();
-        StepVerifier.create(controller.retrieveById(missing)).expectError(MaintenanceTicketNotFoundException.class).verify();
+        StepVerifier.create(controller.retrieveById(ticketId, TENANT)).assertNext(r -> assertEquals(HttpStatus.OK, r.getStatus())).verifyComplete();
+        StepVerifier.create(controller.retrieveById(missing, TENANT)).expectError(MaintenanceTicketNotFoundException.class).verify();
     }
 
     @Test
@@ -103,23 +105,23 @@ class MaintenanceTicketControllerTest {
     @DisplayName("initiateComment delegates with the executor")
     void initiateComment() {
         CaptureCommentRequest request = new CaptureCommentRequest("checked the fan", TicketStatus.IN_ANALYSIS);
-        when(captureCommentUseCase.execute(ticketId, EXECUTOR, request)).thenReturn(Mono.empty());
+        when(captureCommentUseCase.execute(ticketId, UUID.fromString(TENANT), EXECUTOR, request)).thenReturn(Mono.empty());
 
-        StepVerifier.create(controller.initiateComment(ticketId, EXECUTOR, request)).verifyComplete();
+        StepVerifier.create(controller.initiateComment(ticketId, TENANT, EXECUTOR, request)).verifyComplete();
 
-        verify(captureCommentUseCase).execute(ticketId, EXECUTOR, request);
+        verify(captureCommentUseCase).execute(ticketId, UUID.fromString(TENANT), EXECUTOR, request);
     }
 
     @Test
     @DisplayName("control returns 204 and surfaces an illegal transition")
     void control() {
-        when(controlUseCase.execute(ticketId, TicketStatus.IN_ANALYSIS)).thenReturn(Mono.empty());
-        when(controlUseCase.execute(ticketId, TicketStatus.COMPLETED)).thenReturn(Mono.error(new InvalidTicketStatusException("illegal")));
+        when(controlUseCase.execute(ticketId, UUID.fromString(TENANT), TicketStatus.IN_ANALYSIS)).thenReturn(Mono.empty());
+        when(controlUseCase.execute(ticketId, UUID.fromString(TENANT), TicketStatus.COMPLETED)).thenReturn(Mono.error(new InvalidTicketStatusException("illegal")));
 
-        StepVerifier.create(controller.control(ticketId, TicketStatus.IN_ANALYSIS, EXECUTOR))
+        StepVerifier.create(controller.control(ticketId, TENANT, TicketStatus.IN_ANALYSIS, EXECUTOR))
                 .assertNext(r -> assertEquals(HttpStatus.NO_CONTENT, r.getStatus())).verifyComplete();
-        StepVerifier.create(controller.control(ticketId, TicketStatus.COMPLETED, EXECUTOR))
+        StepVerifier.create(controller.control(ticketId, TENANT, TicketStatus.COMPLETED, EXECUTOR))
                 .expectError(InvalidTicketStatusException.class).verify();
-        verify(controlUseCase, org.mockito.Mockito.never()).execute(any(), org.mockito.ArgumentMatchers.eq(TicketStatus.AWAITING_PARTS));
+        verify(controlUseCase, org.mockito.Mockito.never()).execute(any(), any(), org.mockito.ArgumentMatchers.eq(TicketStatus.AWAITING_PARTS));
     }
 }

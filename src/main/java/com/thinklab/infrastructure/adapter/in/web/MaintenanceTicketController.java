@@ -81,10 +81,10 @@ public class MaintenanceTicketController {
 
     /** Behavior Qualifier: {@code retrieve}. Fetches a single MaintenanceTicket by UUID. */
     @Get("/{id}/retrieve")
-    public Mono<HttpResponse<MaintenanceTicketResponse>> retrieveById(@PathVariable UUID id) {
+    public Mono<HttpResponse<MaintenanceTicketResponse>> retrieveById(@PathVariable UUID id, @Header(TENANT_HEADER) @NotBlank String tenantId) {
         log.info("[ACTION: RETRIEVE_MAINTENANCE_TICKET] Received request to get ticket by ID: {}", id);
 
-        return retrieveMaintenanceTicketUseCase.execute(id)
+        return retrieveMaintenanceTicketUseCase.execute(id, UUID.fromString(tenantId))
                 .map(HttpResponse::ok);
     }
 
@@ -103,25 +103,25 @@ public class MaintenanceTicketController {
     @Post("/{id}/comment/initiate")
     @Status(HttpStatus.CREATED)
     public Mono<Void> initiateComment(
-            @PathVariable UUID id,
+            @PathVariable UUID id, @Header(TENANT_HEADER) @NotBlank String tenantId,
             @Header(EXECUTOR_HEADER) @NotBlank String executor,
             @Body @Valid CaptureCommentRequest request
     ) {
         log.info("[ACTION: CAPTURE_MAINTENANCE_COMMENT] [EXECUTOR: {}] Received comment for ticket: {}", executor, id);
 
-        return captureMaintenanceCommentUseCase.execute(id, executor, request);
+        return captureMaintenanceCommentUseCase.execute(id, UUID.fromString(tenantId), executor, request);
     }
 
     /** Behavior Qualifier: {@code control/{targetStatus}}. Direct lifecycle control, independent of comments. */
     @Put("/{id}/control/{targetStatus}")
     public Mono<HttpResponse<Void>> control(
-            @PathVariable UUID id,
+            @PathVariable UUID id, @Header(TENANT_HEADER) @NotBlank String tenantId,
             @PathVariable TicketStatus targetStatus,
             @Header(EXECUTOR_HEADER) @NotBlank String executor
     ) {
         log.info("[ACTION: CONTROL_MAINTENANCE_TICKET] [EXECUTOR: {}] {} for ticket: {}", executor, targetStatus, id);
 
-        return controlMaintenanceTicketUseCase.execute(id, targetStatus)
+        return controlMaintenanceTicketUseCase.execute(id, UUID.fromString(tenantId), targetStatus)
                 .thenReturn(HttpResponse.noContent());
     }
 }

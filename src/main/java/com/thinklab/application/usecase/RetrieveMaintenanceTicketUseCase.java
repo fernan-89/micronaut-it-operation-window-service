@@ -25,10 +25,10 @@ public class RetrieveMaintenanceTicketUseCase {
         this.maintenanceTicketRepository = maintenanceTicketRepository;
     }
 
-    public Mono<MaintenanceTicketResponse> execute(UUID id) {
+    public Mono<MaintenanceTicketResponse> execute(UUID id, UUID organisationId) {
         log.info("[USE CASE] Retrieving maintenance ticket by ID: {}", id);
 
-        return maintenanceTicketRepository.findById(id)
+        return maintenanceTicketRepository.findById(id, organisationId)
                 .switchIfEmpty(Mono.error(new MaintenanceTicketNotFoundException(id)))
                 .map(MaintenanceTicketMapper::toResponse);
     }

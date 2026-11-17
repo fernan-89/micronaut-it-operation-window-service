@@ -93,10 +93,10 @@ public class OperationWindowController {
 
     /** Behavior Qualifier: {@code retrieve}. Fetches a single Operation Window by UUID. */
     @Get("/{id}/retrieve")
-    public Mono<HttpResponse<OperationWindowResponse>> retrieveById(@PathVariable UUID id) {
+    public Mono<HttpResponse<OperationWindowResponse>> retrieveById(@PathVariable UUID id, @Header(TENANT_HEADER) @NotBlank String tenantId) {
         log.info("[ACTION: RETRIEVE_OPERATION_WINDOW] Received request to get window by ID: {}", id);
 
-        return retrieveOperationWindowUseCase.execute(id).map(HttpResponse::ok);
+        return retrieveOperationWindowUseCase.execute(id, UUID.fromString(tenantId)).map(HttpResponse::ok);
     }
 
     /** Behavior Qualifier: {@code retrieve} (collection). Lists tenant-scoped windows, filterable by status / asset. */
@@ -115,31 +115,31 @@ public class OperationWindowController {
     /** Behavior Qualifier: {@code reschedule}. Moves a SCHEDULED window (409 on collision or wrong status). */
     @Put("/{id}/reschedule")
     public Mono<HttpResponse<Void>> reschedule(
-            @PathVariable UUID id,
+            @PathVariable UUID id, @Header(TENANT_HEADER) @NotBlank String tenantId,
             @Header(EXECUTOR_HEADER) @NotBlank String executor,
             @Body @Valid RescheduleOperationWindowRequest request
     ) {
         log.info("[ACTION: RESCHEDULE_OPERATION_WINDOW] [EXECUTOR: {}] Received request to reschedule window ID: {}", executor, id);
 
-        return rescheduleOperationWindowUseCase.execute(id, request).thenReturn(HttpResponse.noContent());
+        return rescheduleOperationWindowUseCase.execute(id, UUID.fromString(tenantId), request).thenReturn(HttpResponse.noContent());
     }
 
     /** Behavior Qualifier: {@code control/start}. SCHEDULED -> IN_PROGRESS. */
     @Put("/{id}/control/start")
-    public Mono<HttpResponse<Void>> controlStart(@PathVariable UUID id, @Header(EXECUTOR_HEADER) @NotBlank String executor) {
-        return control(id, ControlOperationWindowUseCase.Action.START, executor);
+    public Mono<HttpResponse<Void>> controlStart(@PathVariable UUID id, @Header(TENANT_HEADER) @NotBlank String tenantId, @Header(EXECUTOR_HEADER) @NotBlank String executor) {
+        return control(id, tenantId, ControlOperationWindowUseCase.Action.START, executor);
     }
 
     /** Behavior Qualifier: {@code control/complete}. IN_PROGRESS -> COMPLETED (terminal). */
     @Put("/{id}/control/complete")
-    public Mono<HttpResponse<Void>> controlComplete(@PathVariable UUID id, @Header(EXECUTOR_HEADER) @NotBlank String executor) {
-        return control(id, ControlOperationWindowUseCase.Action.COMPLETE, executor);
+    public Mono<HttpResponse<Void>> controlComplete(@PathVariable UUID id, @Header(TENANT_HEADER) @NotBlank String tenantId, @Header(EXECUTOR_HEADER) @NotBlank String executor) {
+        return control(id, tenantId, ControlOperationWindowUseCase.Action.COMPLETE, executor);
     }
 
     /** Behavior Qualifier: {@code control/cancel}. SCHEDULED | IN_PROGRESS -> CANCELLED (terminal, no DELETE). */
     @Put("/{id}/control/cancel")
-    public Mono<HttpResponse<Void>> controlCancel(@PathVariable UUID id, @Header(EXECUTOR_HEADER) @NotBlank String executor) {
-        return control(id, ControlOperationWindowUseCase.Action.CANCEL, executor);
+    public Mono<HttpResponse<Void>> controlCancel(@PathVariable UUID id, @Header(TENANT_HEADER) @NotBlank String tenantId, @Header(EXECUTOR_HEADER) @NotBlank String executor) {
+        return control(id, tenantId, ControlOperationWindowUseCase.Action.CANCEL, executor);
     }
 
     /** Behavior Qualifier: {@code collision-check/evaluate}. Read-only dry-run of a candidate interval. */
@@ -153,9 +153,9 @@ public class OperationWindowController {
         return evaluateWindowCollisionUseCase.execute(UUID.fromString(tenantId), request).map(HttpResponse::ok);
     }
 
-    private Mono<HttpResponse<Void>> control(UUID id, ControlOperationWindowUseCase.Action action, String executor) {
+    private Mono<HttpResponse<Void>> control(UUID id, String tenantId, ControlOperationWindowUseCase.Action action, String executor) {
         log.info("[ACTION: CONTROL_OPERATION_WINDOW] [EXECUTOR: {}] {} for ID: {}", executor, action, id);
 
-        return controlOperationWindowUseCase.execute(id, action).thenReturn(HttpResponse.noContent());
+        return controlOperationWindowUseCase.execute(id, UUID.fromString(tenantId), action).thenReturn(HttpResponse.noContent());
     }
 }

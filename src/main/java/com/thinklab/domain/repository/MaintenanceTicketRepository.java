@@ -19,7 +19,7 @@ public interface MaintenanceTicketRepository {
 
     Mono<MaintenanceTicket> create(MaintenanceTicket ticket);
 
-    Mono<MaintenanceTicket> findById(UUID id);
+    Mono<MaintenanceTicket> findById(UUID id, UUID organisationId);
 
     Flux<MaintenanceTicket> findAllByOrganisationId(UUID organisationId, TicketStatus status);
 

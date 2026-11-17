@@ -34,10 +34,10 @@ public class CaptureMaintenanceCommentUseCase {
         this.maintenanceTicketRepository = maintenanceTicketRepository;
     }
 
-    public Mono<Void> execute(UUID id, String executor, CaptureCommentRequest request) {
+    public Mono<Void> execute(UUID id, UUID organisationId, String executor, CaptureCommentRequest request) {
         log.info("[USE CASE] Capturing comment on maintenance ticket {} [executor={}, targetStatus={}]", id, executor, request.targetStatus());
 
-        return maintenanceTicketRepository.findById(id)
+        return maintenanceTicketRepository.findById(id, organisationId)
                 .switchIfEmpty(Mono.error(new MaintenanceTicketNotFoundException(id)))
                 .flatMap(ticket -> {
                     Comment comment = new Comment(UUID.randomUUID(), executor, request.text(), Instant.now());

@@ -5,6 +5,7 @@ import com.thinklab.infrastructure.adapter.out.persistence.entity.MaintenanceTic
 import io.micronaut.data.mongodb.annotation.MongoRepository;
 import io.micronaut.data.repository.reactive.ReactorCrudRepository;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
@@ -19,6 +20,9 @@ import java.util.UUID;
  */
 @MongoRepository
 public interface MaintenanceTicketMongoRepository extends ReactorCrudRepository<MaintenanceTicketEntity, UUID> {
+
+    /** The entity only if it belongs to the organisation: another tenant's is the same as none (ADR-029 of the tenant audit). */
+    Mono<MaintenanceTicketEntity> findByIdAndOrganisationId(UUID id, UUID organisationId);
 
     Flux<MaintenanceTicketEntity> findByOrganisationId(UUID organisationId);
 
