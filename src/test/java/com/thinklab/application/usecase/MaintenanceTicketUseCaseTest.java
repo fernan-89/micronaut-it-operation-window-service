@@ -65,9 +65,9 @@ class MaintenanceTicketUseCaseTest {
     @Test
     void testRetrieveMaintenanceTicketUseCaseSuccess() {
         RetrieveMaintenanceTicketUseCase useCase = new RetrieveMaintenanceTicketUseCase(maintenanceTicketRepository);
-        when(maintenanceTicketRepository.findById(ticketId)).thenReturn(Mono.just(ticket));
+        when(maintenanceTicketRepository.findById(ticketId, organisationId)).thenReturn(Mono.just(ticket));
 
-        StepVerifier.create(useCase.execute(ticketId))
+        StepVerifier.create(useCase.execute(ticketId, organisationId))
                 .assertNext(res -> assertEquals(ticketId, res.id()))
                 .verifyComplete();
     }
@@ -75,9 +75,9 @@ class MaintenanceTicketUseCaseTest {
     @Test
     void testRetrieveMaintenanceTicketUseCaseNotFound() {
         RetrieveMaintenanceTicketUseCase useCase = new RetrieveMaintenanceTicketUseCase(maintenanceTicketRepository);
-        when(maintenanceTicketRepository.findById(ticketId)).thenReturn(Mono.empty());
+        when(maintenanceTicketRepository.findById(ticketId, organisationId)).thenReturn(Mono.empty());
 
-        StepVerifier.create(useCase.execute(ticketId))
+        StepVerifier.create(useCase.execute(ticketId, organisationId))
                 .expectError(MaintenanceTicketNotFoundException.class)
                 .verify();
     }
@@ -95,19 +95,19 @@ class MaintenanceTicketUseCaseTest {
     @Test
     void testControlMaintenanceTicketUseCase() {
         ControlMaintenanceTicketUseCase useCase = new ControlMaintenanceTicketUseCase(maintenanceTicketRepository);
-        when(maintenanceTicketRepository.findById(ticketId)).thenReturn(Mono.just(ticket));
+        when(maintenanceTicketRepository.findById(ticketId, organisationId)).thenReturn(Mono.just(ticket));
         when(maintenanceTicketRepository.updateStatus(ticketId, TicketStatus.IN_ANALYSIS)).thenReturn(Mono.empty());
 
-        StepVerifier.create(useCase.execute(ticketId, TicketStatus.IN_ANALYSIS))
+        StepVerifier.create(useCase.execute(ticketId, organisationId, TicketStatus.IN_ANALYSIS))
                 .verifyComplete();
     }
 
     @Test
     void testControlMaintenanceTicketUseCaseRejectsIllegalTransition() {
         ControlMaintenanceTicketUseCase useCase = new ControlMaintenanceTicketUseCase(maintenanceTicketRepository);
-        when(maintenanceTicketRepository.findById(ticketId)).thenReturn(Mono.just(ticket));
+        when(maintenanceTicketRepository.findById(ticketId, organisationId)).thenReturn(Mono.just(ticket));
 
-        StepVerifier.create(useCase.execute(ticketId, TicketStatus.COMPLETED))
+        StepVerifier.create(useCase.execute(ticketId, organisationId, TicketStatus.COMPLETED))
                 .expectError(InvalidTicketStatusException.class)
                 .verify();
     }
@@ -116,10 +116,10 @@ class MaintenanceTicketUseCaseTest {
     void testCaptureMaintenanceCommentUseCaseWithoutTransition() {
         CaptureMaintenanceCommentUseCase useCase = new CaptureMaintenanceCommentUseCase(maintenanceTicketRepository);
         CaptureCommentRequest request = new CaptureCommentRequest("Investigating", null);
-        when(maintenanceTicketRepository.findById(ticketId)).thenReturn(Mono.just(ticket));
+        when(maintenanceTicketRepository.findById(ticketId, organisationId)).thenReturn(Mono.just(ticket));
         when(maintenanceTicketRepository.appendComment(eq(ticketId), any(), eq(TicketStatus.OPEN))).thenReturn(Mono.empty());
 
-        StepVerifier.create(useCase.execute(ticketId, "tech-01", request))
+        StepVerifier.create(useCase.execute(ticketId, organisationId, "tech-01", request))
                 .verifyComplete();
     }
 
@@ -127,10 +127,10 @@ class MaintenanceTicketUseCaseTest {
     void testCaptureMaintenanceCommentUseCaseAdvancesFsm() {
         CaptureMaintenanceCommentUseCase useCase = new CaptureMaintenanceCommentUseCase(maintenanceTicketRepository);
         CaptureCommentRequest request = new CaptureCommentRequest("Starting analysis", TicketStatus.IN_ANALYSIS);
-        when(maintenanceTicketRepository.findById(ticketId)).thenReturn(Mono.just(ticket));
+        when(maintenanceTicketRepository.findById(ticketId, organisationId)).thenReturn(Mono.just(ticket));
         when(maintenanceTicketRepository.appendComment(eq(ticketId), any(), eq(TicketStatus.IN_ANALYSIS))).thenReturn(Mono.empty());
 
-        StepVerifier.create(useCase.execute(ticketId, "tech-01", request))
+        StepVerifier.create(useCase.execute(ticketId, organisationId, "tech-01", request))
                 .verifyComplete();
     }
 
@@ -138,9 +138,9 @@ class MaintenanceTicketUseCaseTest {
     void testCaptureMaintenanceCommentUseCaseRejectsIllegalTargetStatus() {
         CaptureMaintenanceCommentUseCase useCase = new CaptureMaintenanceCommentUseCase(maintenanceTicketRepository);
         CaptureCommentRequest request = new CaptureCommentRequest("Trying to skip ahead", TicketStatus.COMPLETED);
-        when(maintenanceTicketRepository.findById(ticketId)).thenReturn(Mono.just(ticket));
+        when(maintenanceTicketRepository.findById(ticketId, organisationId)).thenReturn(Mono.just(ticket));
 
-        StepVerifier.create(useCase.execute(ticketId, "tech-01", request))
+        StepVerifier.create(useCase.execute(ticketId, organisationId, "tech-01", request))
                 .expectError(InvalidTicketStatusException.class)
                 .verify();
     }

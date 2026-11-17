@@ -29,10 +29,10 @@ public class ControlMaintenanceTicketUseCase {
         this.maintenanceTicketRepository = maintenanceTicketRepository;
     }
 
-    public Mono<Void> execute(UUID id, TicketStatus targetStatus) {
+    public Mono<Void> execute(UUID id, UUID organisationId, TicketStatus targetStatus) {
         log.info("[USE CASE] Controlling maintenance ticket lifecycle: {} for ID: {}", targetStatus, id);
 
-        return maintenanceTicketRepository.findById(id)
+        return maintenanceTicketRepository.findById(id, organisationId)
                 .switchIfEmpty(Mono.error(new MaintenanceTicketNotFoundException(id)))
                 .flatMap(ticket -> {
                     ticket.changeStatus(targetStatus);

@@ -51,7 +51,7 @@ SCHEDULED | IN_PROGRESS -> CANCELLED (terminal, soft — no DELETE)
 
 ## BIAN Behavior Qualifier Contract
 
-`X-Tenant-Id` is mandatory on `initiate`, the collection `retrieve` and `collision-check/evaluate`;
+`X-Tenant-Id` is mandatory on every route (ADR-022: another tenant's window or ticket is a 404);
 `X-Executor` on every mutation.
 
 `initiate` takes an optional `changeFreezeOverrideJustification` (ADR-020): a `DEPLOYMENT` window carrying it is reserved over an

@@ -123,7 +123,7 @@ class OperationWindowPersistenceIT implements TestPropertyProvider {
 
         windows.updateSchedule(moved.getId(), at(14), at(16)).block();
 
-        OperationWindow found = windows.findById(moved.getId()).block();
+        OperationWindow found = windows.findById(moved.getId(), moved.getOrganisationId()).block();
         assertEquals(at(14), found.getStartAt());
         assertEquals(at(16), found.getEndAt());
         assertEquals(Set.of(), overlapping(organisation, 10, 12));
@@ -142,7 +142,17 @@ class OperationWindowPersistenceIT implements TestPropertyProvider {
         assertEquals(Set.of(withAsset.getId(), other.getId()), ids(windows.findAllByOrganisationId(organisation, null, null).collectList().block()));
         assertEquals(Set.of(withAsset.getId()), ids(windows.findAllByOrganisationId(organisation, WindowStatus.SCHEDULED, null).collectList().block()));
         assertEquals(Set.of(withAsset.getId()), ids(windows.findAllByOrganisationId(organisation, null, asset).collectList().block()));
-        assertEquals(Set.of(asset), windows.findById(withAsset.getId()).block().getTargetAssetIds());
+        assertEquals(Set.of(asset), windows.findById(withAsset.getId(), withAsset.getOrganisationId()).block().getTargetAssetIds());
+    }
+
+    @Test
+    @DisplayName("a window is found by id for its own organisation only: another tenant's is the same as none")
+    void scopedToItsOrganisation() {
+        UUID organisation = UUID.randomUUID();
+        OperationWindow created = window(organisation, 1, 2);
+
+        assertEquals(created.getId(), windows.findById(created.getId(), organisation).block().getId());
+        assertNull(windows.findById(created.getId(), UUID.randomUUID()).block());
     }
 
     @Test
@@ -150,10 +160,10 @@ class OperationWindowPersistenceIT implements TestPropertyProvider {
     void notFound() {
         UUID unknown = UUID.randomUUID();
 
-        assertNull(windows.findById(unknown).block());
+        assertNull(windows.findById(unknown, UUID.randomUUID()).block());
         assertThrows(WindowNotFoundException.class, () -> windows.updateStatus(unknown, WindowStatus.CANCELLED).block());
         assertThrows(WindowNotFoundException.class, () -> windows.updateSchedule(unknown, at(1), at(2)).block());
-        assertNull(tickets.findById(unknown).block());
+        assertNull(tickets.findById(unknown, UUID.randomUUID()).block());
         assertThrows(MaintenanceTicketNotFoundException.class, () -> tickets.updateStatus(unknown, TicketStatus.COMPLETED).block());
     }
 
@@ -172,7 +182,7 @@ class OperationWindowPersistenceIT implements TestPropertyProvider {
         tickets.appendComment(ticket.getId(), second, TicketStatus.IN_ANALYSIS).block();
         tickets.updateStatus(ticket.getId(), TicketStatus.COMPLETED).block();
 
-        MaintenanceTicket found = tickets.findById(ticket.getId()).block();
+        MaintenanceTicket found = tickets.findById(ticket.getId(), ticket.getOrganisationId()).block();
         assertEquals(List.of(first, second), found.getComments());
         assertEquals(TicketStatus.COMPLETED, found.getStatus());
         assertEquals(Set.of(untouched.getId()),

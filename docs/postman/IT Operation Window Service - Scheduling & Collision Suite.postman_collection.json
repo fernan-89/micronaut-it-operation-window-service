@@ -275,7 +275,12 @@
           ],
           "name": "02. Retrieve Window By ID (SCHEDULED)",
           "request": {
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
             "method": "GET",
             "url": {
               "host": [
@@ -411,6 +416,10 @@
               {
                 "key": "X-Executor",
                 "value": "{{executor}}"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
               }
             ],
             "method": "PUT",
@@ -447,7 +456,12 @@
           ],
           "name": "06. Retrieve Window By ID (Confirm New Interval)",
           "request": {
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
             "method": "GET",
             "url": {
               "host": [
@@ -575,6 +589,10 @@
               {
                 "key": "X-Executor",
                 "value": "{{executor}}"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
               }
             ],
             "method": "PUT",
@@ -609,7 +627,12 @@
           ],
           "name": "10. Retrieve Window By ID (Confirm IN_PROGRESS)",
           "request": {
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
             "method": "GET",
             "url": {
               "host": [
@@ -643,6 +666,10 @@
               {
                 "key": "X-Executor",
                 "value": "{{executor}}"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
               }
             ],
             "method": "PUT",
@@ -677,7 +704,12 @@
           ],
           "name": "12. Retrieve Window By ID (Confirm COMPLETED)",
           "request": {
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
             "method": "GET",
             "url": {
               "host": [
@@ -759,6 +791,10 @@
               {
                 "key": "X-Executor",
                 "value": "{{executor}}"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
               }
             ],
             "method": "PUT",
@@ -793,7 +829,12 @@
           ],
           "name": "15. Retrieve Window By ID (Confirm CANCELLED)",
           "request": {
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
             "method": "GET",
             "url": {
               "host": [
@@ -882,7 +923,12 @@
           ],
           "name": "02. Retrieve Ticket By ID",
           "request": {
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
             "method": "GET",
             "url": {
               "host": [
@@ -925,6 +971,10 @@
               {
                 "key": "X-Executor",
                 "value": "{{executor}}"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
               }
             ],
             "method": "POST",
@@ -964,7 +1014,12 @@
           ],
           "name": "04. Retrieve Ticket (Confirm IN_ANALYSIS and the comment)",
           "request": {
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
             "method": "GET",
             "url": {
               "host": [
@@ -999,6 +1054,10 @@
               {
                 "key": "X-Executor",
                 "value": "{{executor}}"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
               }
             ],
             "method": "PUT",
@@ -1036,6 +1095,10 @@
               {
                 "key": "X-Executor",
                 "value": "{{executor}}"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
               }
             ],
             "method": "PUT",
@@ -1073,6 +1136,10 @@
               {
                 "key": "X-Executor",
                 "value": "{{executor}}"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
               }
             ],
             "method": "PUT",
@@ -1711,7 +1778,12 @@
           ],
           "name": "12. Retrieve Window - Non-existent UUID (404)",
           "request": {
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
             "method": "GET",
             "url": {
               "host": [
@@ -1741,7 +1813,12 @@
           ],
           "name": "13. Retrieve Window - Malformed UUID Path (400)",
           "request": {
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
             "method": "GET",
             "url": {
               "host": [
@@ -1775,6 +1852,10 @@
               {
                 "key": "X-Executor",
                 "value": "{{executor}}"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
               }
             ],
             "method": "PUT",
@@ -1824,6 +1905,10 @@
               {
                 "key": "X-Executor",
                 "value": "{{executor}}"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
               }
             ],
             "method": "PUT",
@@ -1865,6 +1950,10 @@
               {
                 "key": "X-Executor",
                 "value": "{{executor}}"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
               }
             ],
             "method": "PUT",
@@ -1901,6 +1990,10 @@
               {
                 "key": "X-Executor",
                 "value": "{{executor}}"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
               }
             ],
             "method": "PUT",
@@ -1942,6 +2035,10 @@
               {
                 "key": "X-Executor",
                 "value": "{{executor}}"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
               }
             ],
             "method": "PUT",
@@ -1979,7 +2076,12 @@
           ],
           "name": "19. Ticket: Retrieve Non-existent UUID (404)",
           "request": {
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
+              }
+            ],
             "method": "GET",
             "url": {
               "host": [
@@ -2067,6 +2169,10 @@
               {
                 "key": "X-Executor",
                 "value": "{{executor}}"
+              },
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{organisationId}}"
               }
             ],
             "method": "PUT",
@@ -2088,6 +2194,99 @@
         }
       ],
       "name": "03. Negative Tests & Boundary Validation"
+    },
+    {
+      "name": "04. Tenant Isolation on the By-Id Routes",
+      "item": [
+        {
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('otherOrganisationId', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404 (another tenant\\'s object is the same as none)', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "90. Read it as another tenant (404)",
+          "request": {
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{otherOrganisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "{{windowId}}",
+                "retrieve"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/{{windowId}}/retrieve"
+            }
+          }
+        },
+        {
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404 (another tenant\\'s object is the same as none)', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "name": "92. Change it as another tenant (404)",
+          "request": {
+            "header": [
+              {
+                "key": "X-Tenant-Id",
+                "value": "{{otherOrganisationId}}"
+              },
+              {
+                "key": "X-Executor",
+                "value": "{{executor}}"
+              }
+            ],
+            "method": "PUT",
+            "url": {
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "it-operation-window",
+                "v1",
+                "{{windowId}}",
+                "control",
+                "cancel"
+              ],
+              "raw": "{{base_url}}/it-operation-window/v1/{{windowId}}/control/cancel"
+            }
+          }
+        }
+      ]
     }
   ],
   "variable": [

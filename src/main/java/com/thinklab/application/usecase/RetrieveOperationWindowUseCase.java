@@ -25,10 +25,10 @@ public class RetrieveOperationWindowUseCase {
         this.repository = repository;
     }
 
-    public Mono<OperationWindowResponse> execute(UUID id) {
+    public Mono<OperationWindowResponse> execute(UUID id, UUID organisationId) {
         log.info("[USE CASE] Retrieving operation window ID: {}", id);
 
-        return repository.findById(id)
+        return repository.findById(id, organisationId)
                 .switchIfEmpty(Mono.error(new WindowNotFoundException(id)))
                 .map(OperationWindowMapper::toResponse);
     }

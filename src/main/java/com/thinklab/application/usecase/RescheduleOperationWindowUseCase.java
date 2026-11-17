@@ -30,10 +30,10 @@ public class RescheduleOperationWindowUseCase {
         this.collisionGuard = collisionGuard;
     }
 
-    public Mono<Void> execute(UUID id, RescheduleOperationWindowRequest request) {
+    public Mono<Void> execute(UUID id, UUID organisationId, RescheduleOperationWindowRequest request) {
         log.info("[USE CASE] Rescheduling operation window ID: {}", id);
 
-        return repository.findById(id)
+        return repository.findById(id, organisationId)
                 .switchIfEmpty(Mono.error(new WindowNotFoundException(id)))
                 .flatMap(window -> {
                     window.reschedule(request.startAt(), request.endAt());

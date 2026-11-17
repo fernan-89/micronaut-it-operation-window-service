@@ -46,10 +46,10 @@ public class MaintenanceTicketRepositoryAdapter implements MaintenanceTicketRepo
     }
 
     @Override
-    public Mono<MaintenanceTicket> findById(UUID id) {
+    public Mono<MaintenanceTicket> findById(UUID id, UUID organisationId) {
         log.debug("[PERSISTENCE] Fetching MaintenanceTicket Aggregate by ID: {}", id);
 
-        return repository.findById(id).map(MaintenanceTicketEntity::toDomain);
+        return repository.findByIdAndOrganisationId(id, organisationId).map(MaintenanceTicketEntity::toDomain);
     }
 
     @Override

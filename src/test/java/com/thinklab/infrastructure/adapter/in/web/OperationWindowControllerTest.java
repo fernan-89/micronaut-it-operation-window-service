@@ -43,6 +43,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class OperationWindowControllerTest {
 
+    private static final String TENANT = UUID.randomUUID().toString();
+
     private static final String EXECUTOR = "planner-1";
 
     @Mock private InitiateOperationWindowUseCase initiateUseCase;
@@ -97,14 +99,14 @@ class OperationWindowControllerTest {
     @Test
     @DisplayName("retrieveById returns 200 OK and surfaces 404")
     void retrieveById() {
-        when(retrieveUseCase.execute(windowId)).thenReturn(Mono.just(sample));
+        when(retrieveUseCase.execute(windowId, UUID.fromString(TENANT))).thenReturn(Mono.just(sample));
         UUID missing = UUID.randomUUID();
-        when(retrieveUseCase.execute(missing)).thenReturn(Mono.error(new WindowNotFoundException(missing)));
+        when(retrieveUseCase.execute(missing, UUID.fromString(TENANT))).thenReturn(Mono.error(new WindowNotFoundException(missing)));
 
-        StepVerifier.create(controller.retrieveById(windowId))
+        StepVerifier.create(controller.retrieveById(windowId, TENANT))
                 .assertNext(response -> assertEquals(HttpStatus.OK, response.getStatus()))
                 .verifyComplete();
-        StepVerifier.create(controller.retrieveById(missing)).expectError(WindowNotFoundException.class).verify();
+        StepVerifier.create(controller.retrieveById(missing, TENANT)).expectError(WindowNotFoundException.class).verify();
     }
 
     @Test
@@ -122,9 +124,9 @@ class OperationWindowControllerTest {
     @DisplayName("reschedule returns 204 No Content")
     void reschedule() {
         RescheduleOperationWindowRequest request = new RescheduleOperationWindowRequest(start, end);
-        when(rescheduleUseCase.execute(windowId, request)).thenReturn(Mono.empty());
+        when(rescheduleUseCase.execute(windowId, UUID.fromString(TENANT), request)).thenReturn(Mono.empty());
 
-        StepVerifier.create(controller.reschedule(windowId, EXECUTOR, request))
+        StepVerifier.create(controller.reschedule(windowId, TENANT, EXECUTOR, request))
                 .assertNext(response -> assertEquals(HttpStatus.NO_CONTENT, response.getStatus()))
                 .verifyComplete();
     }
@@ -132,24 +134,24 @@ class OperationWindowControllerTest {
     @Test
     @DisplayName("each control endpoint dispatches its action and returns 204")
     void controlEndpoints() {
-        when(controlUseCase.execute(eq(windowId), any(ControlOperationWindowUseCase.Action.class))).thenReturn(Mono.empty());
+        when(controlUseCase.execute(eq(windowId), eq(UUID.fromString(TENANT)), any(ControlOperationWindowUseCase.Action.class))).thenReturn(Mono.empty());
 
-        StepVerifier.create(controller.controlStart(windowId, EXECUTOR)).assertNext(r -> assertEquals(HttpStatus.NO_CONTENT, r.getStatus())).verifyComplete();
-        StepVerifier.create(controller.controlComplete(windowId, EXECUTOR)).assertNext(r -> assertEquals(HttpStatus.NO_CONTENT, r.getStatus())).verifyComplete();
-        StepVerifier.create(controller.controlCancel(windowId, EXECUTOR)).assertNext(r -> assertEquals(HttpStatus.NO_CONTENT, r.getStatus())).verifyComplete();
+        StepVerifier.create(controller.controlStart(windowId, TENANT, EXECUTOR)).assertNext(r -> assertEquals(HttpStatus.NO_CONTENT, r.getStatus())).verifyComplete();
+        StepVerifier.create(controller.controlComplete(windowId, TENANT, EXECUTOR)).assertNext(r -> assertEquals(HttpStatus.NO_CONTENT, r.getStatus())).verifyComplete();
+        StepVerifier.create(controller.controlCancel(windowId, TENANT, EXECUTOR)).assertNext(r -> assertEquals(HttpStatus.NO_CONTENT, r.getStatus())).verifyComplete();
 
-        verify(controlUseCase).execute(windowId, ControlOperationWindowUseCase.Action.START);
-        verify(controlUseCase).execute(windowId, ControlOperationWindowUseCase.Action.COMPLETE);
-        verify(controlUseCase).execute(windowId, ControlOperationWindowUseCase.Action.CANCEL);
+        verify(controlUseCase).execute(windowId, UUID.fromString(TENANT), ControlOperationWindowUseCase.Action.START);
+        verify(controlUseCase).execute(windowId, UUID.fromString(TENANT), ControlOperationWindowUseCase.Action.COMPLETE);
+        verify(controlUseCase).execute(windowId, UUID.fromString(TENANT), ControlOperationWindowUseCase.Action.CANCEL);
     }
 
     @Test
     @DisplayName("a control endpoint surfaces an illegal transition")
     void controlIllegal() {
-        when(controlUseCase.execute(windowId, ControlOperationWindowUseCase.Action.COMPLETE))
+        when(controlUseCase.execute(windowId, UUID.fromString(TENANT), ControlOperationWindowUseCase.Action.COMPLETE))
                 .thenReturn(Mono.error(new InvalidWindowStatusException("illegal")));
 
-        StepVerifier.create(controller.controlComplete(windowId, EXECUTOR)).expectError(InvalidWindowStatusException.class).verify();
+        StepVerifier.create(controller.controlComplete(windowId, TENANT, EXECUTOR)).expectError(InvalidWindowStatusException.class).verify();
     }
 
     @Test

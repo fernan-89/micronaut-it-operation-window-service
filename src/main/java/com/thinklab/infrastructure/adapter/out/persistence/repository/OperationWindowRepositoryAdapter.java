@@ -45,10 +45,10 @@ public class OperationWindowRepositoryAdapter implements OperationWindowReposito
     }
 
     @Override
-    public Mono<OperationWindow> findById(UUID id) {
+    public Mono<OperationWindow> findById(UUID id, UUID organisationId) {
         log.debug("[PERSISTENCE] Fetching OperationWindow Aggregate by ID: {}", id);
 
-        return repository.findById(id).map(OperationWindowEntity::toDomain);
+        return repository.findByIdAndOrganisationId(id, organisationId).map(OperationWindowEntity::toDomain);
     }
 
     @Override

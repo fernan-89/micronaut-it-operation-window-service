@@ -85,12 +85,12 @@ class OperationWindowRepositoryAdapterTest {
     @Test
     @DisplayName("findById maps the entity, or completes empty")
     void findById() {
-        when(repository.findById(window.getId())).thenReturn(Mono.just(entityA)).thenReturn(Mono.empty());
+        when(repository.findByIdAndOrganisationId(window.getId(), window.getOrganisationId())).thenReturn(Mono.just(entityA)).thenReturn(Mono.empty());
 
-        StepVerifier.create(adapter.findById(window.getId()))
+        StepVerifier.create(adapter.findById(window.getId(), window.getOrganisationId()))
                 .expectNextMatches(found -> found.getTitle().equals("Firmware"))
                 .verifyComplete();
-        StepVerifier.create(adapter.findById(window.getId())).verifyComplete();
+        StepVerifier.create(adapter.findById(window.getId(), window.getOrganisationId())).verifyComplete();
     }
 
     @Test
